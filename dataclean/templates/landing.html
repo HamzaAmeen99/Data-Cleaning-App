@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}DataClean OS — Messy Data In. Pristine Insights Out.{% endblock %}
+
+{% block content %}
+<div class="flex flex-col w-full">
+
+  <!-- Hero Section -->
+  <section class="relative w-full bg-primary text-on-primary overflow-hidden pt-20 pb-28 px-6 lg:px-12">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
+      
+      <!-- Left Column: Copy & CTAs -->
+      <div class="lg:col-span-7 flex flex-col items-start gap-space-lg">
+        <div class="inline-flex items-center gap-space-sm px-space-md py-space-xs rounded-full bg-primary-container text-on-primary-container text-label-md border border-outline-variant">
+          <span class="material-symbols-outlined text-[16px] text-secondary">bolt</span>
+          <span>Next-Gen No-Code Data Cleaning Engine</span>
+        </div>
+
+        <h1 class="font-headline-lg text-on-primary tracking-tight text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
+          Messy data in.<br/>
+          <span class="text-secondary-fixed-dim">Pristine insights out.</span>
+        </h1>
+
+        <p class="font-body-lg text-primary-fixed-dim max-w-2xl">
+          Automate data cleaning, standardize schemas, impute missing values, and eliminate duplicates at scale with deterministic rules built for researchers, analysts, and students.
+        </p>
+
+        <div class="flex flex-wrap items-center gap-space-md pt-space-sm">
+          <a class="btn btn-lg btn-primary flex items-center gap-space-sm shadow-lg" href="{{ url_for('upload.upload_page') }}">
+            <span>Start Cleaning Free</span>
+            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </a>
+          <a class="btn btn-lg btn-surface flex items-center gap-space-sm" href="{{ url_for('upload.load_sample') }}">
+            <span class="material-symbols-outlined text-[18px]">school</span>
+            <span>Try Sample Dataset</span>
+          </a>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-6 pt-space-md text-primary-fixed-dim text-body-sm">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-tertiary-fixed text-[18px]">check_circle</span>
+            <span>Zero Data Retention</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-tertiary-fixed text-[18px]">check_circle</span>
+            <span>In-Browser Privacy</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-tertiary-fixed text-[18px]">check_circle</span>
+            <span>CSV, XLSX &amp; XLS Ready</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Interactive Terminal Teaser -->
+      <div class="lg:col-span-5">
+        <div class="bg-primary-container p-6 rounded-xl shadow-2xl relative overflow-hidden border border-outline-variant">
+          <div class="flex items-center justify-between pb-space-md border-b border-outline-variant">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-error" style="width: 10px; height: 10px; border-radius: 50%;"></div>
+              <div class="w-3 h-3 rounded-full bg-warning" style="width: 10px; height: 10px; border-radius: 50%;"></div>
+              <div class="w-3 h-3 rounded-full bg-tertiary-fixed" style="width: 10px; height: 10px; border-radius: 50%;"></div>
+            </div>
+            <span class="font-code-sm text-on-primary-container">dataclean_engine_v2.py</span>
+          </div>
+
+          <div class="bg-primary p-4 rounded-lg font-code-sm text-primary-fixed-dim space-y-2 mt-4 overflow-x-auto" style="line-height: 1.8;">
+            <p><span class="text-tertiary-fixed-dim">[INFO]</span> Ingesting raw_student_records.csv...</p>
+            <p><span class="text-tertiary-fixed-dim">[PASS]</span> Schema mapping verified: 12 columns detected.</p>
+            <p><span class="text-secondary-fixed-dim">[WARN]</span> 243 missing values in 'CGPA'. Imputing with median...</p>
+            <p><span class="text-secondary-fixed-dim">[WARN]</span> 17 duplicate records identified. Deduplicating...</p>
+            <p><span class="text-secondary-fixed-dim">[WARN]</span> Inconsistent casing in 'Department'. Standardizing...</p>
+            <p class="text-tertiary-fixed font-bold">[SUCCESS] 100% data integrity restored. Ready for export.</p>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-outline-variant flex justify-between items-center text-body-sm text-on-primary-container">
+            <span>Execution Speed: <strong>Instant (Pandas)</strong></span>
+            <span class="text-tertiary-fixed font-medium">Status: Operational</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Before / After Visual Bento Teaser -->
+  <section class="w-full py-24 px-6 lg:px-12 bg-surface">
+    <div class="max-w-7xl mx-auto flex flex-col gap-space-xl">
+      <div class="text-center max-w-2xl mx-auto">
+        <span class="text-secondary font-label-md uppercase tracking-widest font-semibold">Visual Transformation</span>
+        <h2 class="font-headline-lg text-on-surface mt-2">Raw Chaos to Structured Clarity</h2>
+        <p class="font-body-lg text-on-surface-variant mt-2">Inspect how DataClean flags formatting drift, missing entries, and inconsistencies.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+        <!-- Raw Input Card -->
+        <div class="lg:col-span-6 bg-surface-container-low p-8 rounded-xl flex flex-col justify-between shadow-sm border border-border">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <span class="px-3 py-1 bg-error-container text-on-error-container rounded font-label-sm font-semibold">Raw Input Data</span>
+              <span class="font-code-sm text-error font-medium">Anomalies Detected</span>
+            </div>
+            <div class="bg-surface-container-lowest p-4 rounded-lg font-code-sm text-on-surface-variant overflow-x-auto space-y-1 border border-border" style="line-height: 1.8;">
+              <p class="text-error font-semibold">StudentID, Name, Department, CGPA, Email</p>
+              <p>#101,  John Doe , computer science , 3.42, j.doe@uni.edu</p>
+              <p class="text-error">#102, Alice Smith, CS, null, invalid_email (MISSING)</p>
+              <p class="text-error">#101, John Doe, Computer Science, 3.42, j.doe@uni.edu (DUPLICATE)</p>
+              <p>#103, Bob Vance, Computer SCIENCE, 2.95, bob@vance.edu</p>
+            </div>
+          </div>
+          <div class="mt-6 pt-4 border-t border-border">
+            <h3 class="font-headline-sm text-on-surface">The Problem: Dirty Data Bleed</h3>
+            <p class="font-body-md text-on-surface-variant mt-1">Typographical errors, trailing whitespace, missing numerical values, and duplicate records invalidate downstream analyses.</p>
+          </div>
+        </div>
+
+        <!-- Cleaned Output Card -->
+        <div class="lg:col-span-6 bg-primary-container p-8 rounded-xl flex flex-col justify-between shadow-xl text-on-primary border border-outline-variant">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <span class="px-3 py-1 bg-tertiary-container text-tertiary-fixed rounded font-label-sm font-semibold">Cleaned Output</span>
+              <span class="font-code-sm text-tertiary-fixed font-medium">100% Analysis Ready</span>
+            </div>
+            <div class="bg-primary p-4 rounded-lg font-code-sm text-primary-fixed-dim overflow-x-auto space-y-1 border border-outline-variant" style="line-height: 1.8;">
+              <p class="text-tertiary-fixed font-semibold">student_id, full_name, department, cgpa, email</p>
+              <p>101, John Doe, Computer Science, 3.42, j.doe@uni.edu</p>
+              <p>102, Alice Smith, Computer Science, 3.18, alice@uni.edu</p>
+              <p>103, Bob Vance, Computer Science, 2.95, bob@vance.edu</p>
+              <p class="text-tertiary-fixed font-medium">✓ 1 duplicate row removed • Whitespace trimmed • Imputed median</p>
+            </div>
+          </div>
+          <div class="mt-6 pt-4 border-t border-outline-variant">
+            <h3 class="font-headline-sm text-on-primary">The Solution: DataClean OS</h3>
+            <p class="font-body-md text-on-primary-container mt-1">Deterministic deduplication, smart imputation (mean, median, mode), whitespace trimming, and category mapping ensure clean data.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Pillars -->
+  <section class="w-full py-24 px-6 lg:px-12 bg-surface-container-low">
+    <div class="max-w-7xl mx-auto flex flex-col gap-space-xl">
+      <div class="text-center max-w-2xl mx-auto">
+        <span class="text-secondary font-label-md uppercase tracking-widest font-semibold">Core Capabilities</span>
+        <h2 class="font-headline-lg text-on-surface mt-2">Engineered for Precision</h2>
+        <p class="font-body-lg text-on-surface-variant mt-2">Everything you need to transform messy tabular datasets into pristine spreadsheets.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm flex flex-col gap-4 border border-border">
+          <div class="kpi-icon-wrap bg-secondary-fixed text-secondary">
+            <span class="material-symbols-outlined text-[24px]">auto_fix_high</span>
+          </div>
+          <h3 class="font-headline-sm text-on-surface">Smart Imputation</h3>
+          <p class="font-body-md text-on-surface-variant">Fill missing values using statistical mean, median, most frequent mode, or custom placeholder strings per column.</p>
+        </div>
+
+        <div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm flex flex-col gap-4 border border-border">
+          <div class="kpi-icon-wrap bg-tertiary-fixed text-on-tertiary-fixed">
+            <span class="material-symbols-outlined text-[24px]">difference</span>
+          </div>
+          <h3 class="font-headline-sm text-on-surface">Deduplication &amp; Trimming</h3>
+          <p class="font-body-md text-on-surface-variant">Strip invisible leading and trailing whitespace, then automatically identify and eliminate exact duplicate records.</p>
+        </div>
+
+        <div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm flex flex-col gap-4 border border-border">
+          <div class="kpi-icon-wrap bg-primary-fixed text-primary">
+            <span class="material-symbols-outlined text-[24px]">history</span>
+          </div>
+          <h3 class="font-headline-sm text-on-surface">Plain-Language Audit Log</h3>
+          <p class="font-body-md text-on-surface-variant">Every operation produces a deterministic change history log detailing exactly what was altered before you export.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step-by-Step Pipeline -->
+  <section class="w-full py-24 px-6 lg:px-12 bg-surface">
+    <div class="max-w-7xl mx-auto flex flex-col gap-space-xl">
+      <div class="text-center max-w-2xl mx-auto">
+        <span class="text-secondary font-label-md uppercase tracking-widest font-semibold">Workflow</span>
+        <h2 class="font-headline-lg text-on-surface mt-2">From Messy File to Clean Data in 4 Steps</h2>
+        <p class="font-body-lg text-on-surface-variant mt-2">A deterministic, human-controlled path to clean tabular data.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-surface-container p-6 rounded-xl flex flex-col gap-3 border border-border">
+          <span class="text-secondary font-headline-lg font-bold opacity-40">01</span>
+          <h3 class="font-headline-sm text-on-surface">Upload</h3>
+          <p class="font-body-md text-on-surface-variant">Drop your CSV, XLSX or XLS dataset. Processed locally in memory.</p>
+        </div>
+
+        <div class="bg-surface-container p-6 rounded-xl flex flex-col gap-3 border border-border">
+          <span class="text-secondary font-headline-lg font-bold opacity-40">02</span>
+          <h3 class="font-headline-sm text-on-surface">Inspect</h3>
+          <p class="font-body-md text-on-surface-variant">Review rows, columns, missing values, duplicates, and completeness rates.</p>
+        </div>
+
+        <div class="bg-surface-container p-6 rounded-xl flex flex-col gap-3 border border-border">
+          <span class="text-secondary font-headline-lg font-bold opacity-40">03</span>
+          <h3 class="font-headline-sm text-on-surface">Choose Fixes</h3>
+          <p class="font-body-md text-on-surface-variant">Configure precise operations: casing fixes, category mappings, and type conversions.</p>
+        </div>
+
+        <div class="bg-surface-container p-6 rounded-xl flex flex-col gap-3 border border-border">
+          <span class="text-secondary font-headline-lg font-bold opacity-40">04</span>
+          <h3 class="font-headline-sm text-on-surface">Export</h3>
+          <p class="font-body-md text-on-surface-variant">Preview cleaned rows, review the change log, and download as CSV or Excel.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dual CTA Section -->
+  <section class="w-full py-24 px-6 lg:px-12 bg-primary text-on-primary">
+    <div class="max-w-5xl mx-auto bg-primary-container p-12 lg:p-16 rounded-2xl shadow-2xl flex flex-col items-center text-center gap-space-lg relative overflow-hidden border border-outline-variant">
+      <span class="px-space-md py-space-xs rounded-full bg-secondary-soft text-secondary-fixed-dim text-label-md font-semibold">
+        Ready for Clean Tabular Data?
+      </span>
+      <h2 class="font-headline-lg text-on-primary max-w-2xl text-3xl lg:text-4xl font-bold">
+        Transform your messy spreadsheets in seconds.
+      </h2>
+      <p class="font-body-lg text-primary-fixed-dim max-w-xl">
+        No login, no complex code, no subscriptions — a focused no-code utility built for clean data.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-space-md pt-2">
+        <a class="btn btn-lg btn-primary flex items-center gap-space-sm shadow-lg" href="{{ url_for('upload.upload_page') }}">
+          <span>Get Started Free</span>
+          <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+        </a>
+        <a class="btn btn-lg btn-surface" href="{{ url_for('upload.load_sample') }}">
+          Try Sample Dataset
+        </a>
+      </div>
+      <span class="text-on-primary-container text-body-sm pt-2">100% Client Privacy • Files processed in your active browser session</span>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

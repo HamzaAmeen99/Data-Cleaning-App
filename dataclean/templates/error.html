@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Error — DataClean OS{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-6 py-24 flex flex-col items-center text-center gap-6">
+  <div class="w-16 h-16 rounded-2xl bg-error-container text-on-error-container flex items-center justify-center shadow-sm">
+    <span class="material-symbols-outlined text-[36px]">error</span>
+  </div>
+
+  <h1 class="font-headline-lg text-on-surface">Something Went Wrong</h1>
+  <p class="font-body-lg text-on-surface-variant max-w-md">
+    {{ message or "An unexpected issue occurred while processing your dataset." }}
+  </p>
+
+  <div class="flex items-center gap-3 pt-4">
+    <a href="{{ url_for('upload.index') }}" class="btn btn-primary btn-lg flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">home</span>
+      <span>Back to Homepage</span>
+    </a>
+    <a href="{{ url_for('upload.upload_page') }}" class="btn btn-surface btn-lg flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]">upload_file</span>
+      <span>Upload Workspace</span>
+    </a>
+  </div>
+</div>
+{% endblock %}

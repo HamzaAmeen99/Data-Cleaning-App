@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Dataset Explorer — DataClean OS{% endblock %}
+
+{% block content %}
+<div class="flex flex-col w-full min-h-screen bg-surface text-on-surface pb-16">
+
+  <!-- Top Workspace Header Bar -->
+  <div class="w-full bg-surface-container-low px-6 lg:px-12 py-6 border-b border-border">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-container text-label-sm uppercase tracking-wider font-semibold">
+            Active Workspace
+          </span>
+          <span class="text-outline text-body-sm">/</span>
+          <span class="text-on-surface-variant text-body-sm font-code-sm font-medium">{{ filename }}</span>
+          {% if is_cleaned %}
+            <span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-semibold">Cleaned</span>
+          {% else %}
+            <span class="px-2 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold">Raw Upload</span>
+          {% endif %}
+        </div>
+        <h1 class="font-headline-lg text-on-surface tracking-tight">Dataset Health &amp; Column Explorer</h1>
+      </div>
+
+      <div class="flex items-center gap-3">
+        {% if is_cleaned %}
+          <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2" onclick="return confirm('Revert back to the uncleaned raw upload?')">
+            <span class="material-symbols-outlined text-[18px]">history</span>
+            <span>Reset to Original</span>
+          </a>
+        {% endif %}
+        <a href="{{ url_for('dataset.dataset_analysis') }}" class="btn btn-primary flex items-center gap-2 shadow-sm">
+          <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
+          <span>Configure Cleaning Operations →</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto w-full px-6 lg:px-12 py-8 flex flex-col gap-8">
+    
+    <!-- KPI Stat Cards Grid (4 Columns) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1: Rows -->
+      <div class="kpi-card">
+        <div class="glow-blob bg-secondary-soft"></div>
+        <div class="flex justify-between items-start mb-4">
+          <span class="text-on-surface-variant text-label-md font-medium">Total Rows</span>
+          <div class="kpi-icon-wrap bg-secondary-fixed text-secondary">
+            <span class="material-symbols-outlined text-[20px]">table_rows</span>
+          </div>
+        </div>
+        <div>
+          <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.rows | number_format }}</div>
+          <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
+            <span class="material-symbols-outlined text-[16px] text-tertiary-container">check_circle</span>
+            <span>Total records in dataset</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Columns -->
+      <div class="kpi-card">
+        <div class="glow-blob bg-primary-fixed"></div>
+        <div class="flex justify-between items-start mb-4">
+          <span class="text-on-surface-variant text-label-md font-medium">Columns</span>
+          <div class="kpi-icon-wrap bg-primary-fixed text-primary">
+            <span class="material-symbols-outlined text-[20px]">view_column</span>
+          </div>
+        </div>
+        <div>
+          <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.columns }}</div>
+          <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
+            <span class="material-symbols-outlined text-[16px] text-secondary">schema</span>
+            <span>Detected schema attributes</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Missing Values -->
+      <div class="kpi-card">
+        <div class="glow-blob bg-error-container"></div>
+        <div class="flex justify-between items-start mb-4">
+          <span class="text-on-surface-variant text-label-md font-medium">Missing Values</span>
+          <div class="kpi-icon-wrap bg-error-container text-error">
+            <span class="material-symbols-outlined text-[20px]">warning</span>
+          </div>
+        </div>
+        <div>
+          <div class="font-headline-lg {% if total_missing > 0 %}text-error{% else %}text-on-surface{% endif %} tracking-tight mb-1">
+            {{ total_missing | number_format }}
+          </div>
+          <div class="flex items-center gap-1.5 {% if total_missing > 0 %}text-error{% else %}text-on-surface-variant{% endif %} text-body-sm font-medium">
+            <span class="material-symbols-outlined text-[16px]">{% if total_missing > 0 %}error{% else %}check_circle{% endif %}</span>
+            <span>{% if total_missing > 0 %}Requires imputation or drop{% else %}No null values detected{% endif %}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Duplicates -->
+      <div class="kpi-card">
+        <div class="glow-blob bg-warning-container"></div>
+        <div class="flex justify-between items-start mb-4">
+          <span class="text-on-surface-variant text-label-md font-medium">Duplicates</span>
+          <div class="kpi-icon-wrap bg-tertiary-fixed text-on-tertiary-fixed">
+            <span class="material-symbols-outlined text-[20px]">content_copy</span>
+          </div>
+        </div>
+        <div>
+          <div class="font-headline-lg {% if duplicates > 0 %}text-warning{% else %}text-on-surface{% endif %} tracking-tight mb-1">
+            {{ duplicates | number_format }}
+          </div>
+          <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm font-medium">
+            <span class="material-symbols-outlined text-[16px]">{% if duplicates > 0 %}difference{% else %}done{% endif %}</span>
+            <span>{% if duplicates > 0 %}Identical records detected{% else %}Zero duplicates found{% endif %}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main Content Grid / Split View -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column: Interactive Data Preview Table (8 cols) -->
+      <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col border border-border overflow-hidden">
+        <div class="p-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border">
+          <div>
+            <h2 class="font-headline-sm text-on-surface">Interactive Data Preview</h2>
+            <p class="text-on-surface-variant text-body-sm mt-0.5">Showing first {{ preview_shown }} of {{ total_rows | number_format }} rows</p>
+          </div>
+          <div class="relative w-full sm:w-64">
+            <input class="input-styled" id="preview-search" placeholder="🔍 Filter preview rows..." type="text" aria-label="Filter preview rows"/>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="table-stitch" id="preview-data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                {% for col in preview_columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in preview_values %}
+                <tr>
+                  <td class="text-outline font-code-sm">{{ loop.index }}</td>
+                  {% for value in row %}
+                    <td>
+                      {% if value is none %}
+                        <span class="null-pill" title="Missing value (NaN/Null)">null</span>
+                      {% else %}
+                        {{ value }}
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="p-4 bg-surface-container-low flex justify-between items-center text-body-sm text-on-surface-variant border-t border-border">
+          <span>Showing 1 to {{ preview_shown }} of {{ total_rows | number_format }} rows</span>
+          <div class="flex items-center gap-2">
+            <a href="{{ url_for('dataset.dataset_analysis') }}" class="btn btn-sm btn-primary">
+              Continue to Fixes →
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Column Completeness Breakdown (4 cols) -->
+      <div class="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-sm p-6 flex flex-col justify-between border border-border">
+        <div>
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="font-headline-sm text-on-surface">Column Information</h2>
+            <span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-xs font-semibold">
+              {{ overview.columns }} columns
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-4" style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
+            {% for col in column_info %}
+              {% set miss = col.missing %}
+              {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
+              <div class="flex flex-col gap-1.5 p-3 rounded-lg bg-surface-container-low border border-border">
+                <div class="flex justify-between items-center text-body-md">
+                  <span class="font-medium text-on-surface flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full {% if rate < 80 %}bg-error{% else %}bg-tertiary-fixed{% endif %}" style="width: 8px; height: 8px; border-radius: 50%;"></span>
+                    <strong>{{ col.name }}</strong>
+                  </span>
+                  <span class="font-code-sm {% if miss > 0 %}text-error{% else %}text-on-surface-variant{% endif %} font-medium">
+                    {{ "%.1f" | format(rate) }}%
+                  </span>
+                </div>
+
+                <div class="w-full bg-surface-container-high rounded-full overflow-hidden" style="height: 6px;">
+                  <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full" style="height: 100%; width: {{ rate }}%;"></div>
+                </div>
+
+                <div class="flex justify-between items-center text-body-sm text-on-surface-variant mt-1">
+                  <span class="font-code-sm text-xs text-outline">{{ col.type }}</span>
+                  {% if miss > 0 %}
+                    <span class="text-error font-code-sm text-xs">{{ miss | number_format }} missing</span>
+                  {% else %}
+                    <span class="text-tertiary-container font-code-sm text-xs">✓ Complete</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-border flex flex-col gap-3">
+          {% if total_missing > 0 %}
+            <div class="flex items-center justify-between text-body-sm text-on-surface-variant">
+              <span>Missing Values Alert</span>
+              <span class="text-error font-medium">{{ total_missing | number_format }} cells need fixes</span>
+            </div>
+          {% endif %}
+          <a href="{{ url_for('dataset.dataset_analysis') }}" class="btn btn-primary w-full flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
+            <span>Configure Cleaning Options</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}

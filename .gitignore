@@ -1,0 +1,16 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.freebuff/
+
+# Uploaded and generated data files (never commit user datasets)
+dataclean/uploads/*
+!dataclean/uploads/.gitkeep
+dataclean/processed/*
+!dataclean/processed/.gitkeep
+
+# Flask / environment
+.env
+instance/

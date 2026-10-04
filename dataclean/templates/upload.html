@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Upload Dataset — DataClean OS{% endblock %}
+
+{% block content %}
+<div class="flex flex-col w-full min-h-[calc(100vh-4rem)] bg-surface text-on-surface pb-16">
+
+  <!-- Top Banner / Header Context -->
+  <div class="max-w-7xl w-full mx-auto px-6 lg:px-12 pt-8 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-space-md">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="px-2.5 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold uppercase tracking-wider font-code-sm">
+          Step 01 / Pipeline
+        </span>
+        <span class="text-outline text-body-sm">•</span>
+        <span class="text-on-surface-variant text-body-sm font-medium">Ingestion Gateway</span>
+      </div>
+      <h1 class="font-headline-lg text-on-surface tracking-tight">File Ingestion &amp; Import</h1>
+      <p class="text-on-surface-variant text-body-lg max-w-2xl mt-1">
+        Upload raw datasets for automated cleaning, type casting, anomaly detection, and schema validation.
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="{{ url_for('upload.load_sample') }}" class="btn btn-surface flex items-center gap-2 text-label-md">
+        <span class="material-symbols-outlined text-[18px]">school</span>
+        <span>Load Sample Dataset</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="max-w-7xl w-full mx-auto px-6 lg:px-12 py-space-md grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+    
+    <!-- Left Column: Upload Dropzone & Quick Presets (8 cols) -->
+    <div class="lg:col-span-8 flex flex-col gap-space-lg">
+      
+      <!-- Upload Form with Dropzone -->
+      <form id="upload-form" action="{{ url_for('upload.upload_dataset') }}" method="post" enctype="multipart/form-data">
+        <input type="file" id="file-input" name="file" accept=".csv,.xlsx,.xls" class="hidden" aria-label="Upload CSV or Excel file">
+        
+        <label for="file-input" class="dropzone-box" id="dropzone">
+          <div class="dropzone-icon-wrap">
+            <span class="material-symbols-outlined text-[32px]">cloud_upload</span>
+          </div>
+
+          <h3 class="font-headline-sm text-on-surface mb-1" id="upload-text">Drag and drop your dataset here</h3>
+          <p class="text-on-surface-variant text-body-md mb-4">Supports .CSV, .XLSX, .XLS up to 16MB</p>
+
+          <div class="flex items-center gap-3">
+            <button type="button" class="btn btn-dark" onclick="document.getElementById('file-input').click()">
+              Browse Files
+            </button>
+            <span class="text-outline text-body-sm">or click anywhere in box</span>
+          </div>
+
+          <div class="file-format-pills">
+            <span class="format-pill">.csv</span>
+            <span class="format-pill">.xlsx</span>
+            <span class="format-pill">.xls</span>
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-border w-full flex items-center justify-between text-body-sm text-on-surface-variant">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[16px] text-tertiary-container">lock</span>
+              <span>Client-side secure parsing &amp; in-memory validation</span>
+            </div>
+            <span class="font-code-sm">Max limit: 16 MB</span>
+          </div>
+        </label>
+
+        <!-- Selected File State Card (Hidden by default, shown when file selected) -->
+        <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col gap-4 mt-6 border border-border hidden" id="file-state-card">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
+              <span class="font-headline-sm text-on-surface">Ready for Ingestion</span>
+            </div>
+            <span class="px-2.5 py-1 rounded bg-secondary-soft text-secondary font-code-sm text-xs font-semibold">Validated</span>
+          </div>
+
+          <div class="p-4 rounded-lg bg-surface-container-lowest flex items-center gap-4 border border-border">
+            <div class="w-10 h-10 rounded bg-primary text-on-primary flex items-center justify-center shrink-0 font-code-sm font-bold text-xs">
+              DATA
+            </div>
+            <div class="min-w-0 flex-1">
+              <h5 class="font-headline-sm text-on-surface truncate text-sm" id="file-name">Selected File</h5>
+              <p class="text-body-sm text-on-surface-variant" id="file-meta">Ready for processing</p>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-lg btn-primary w-full shadow-md flex items-center justify-center gap-2" id="upload-btn">
+            <span>Upload &amp; Analyze Dataset</span>
+            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Sample Dataset Preset Card -->
+      <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-border">
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[24px]">school</span>
+          </div>
+          <div>
+            <h4 class="font-headline-sm text-on-surface">Sample Academic Dataset</h4>
+            <p class="text-body-md text-on-surface-variant">Load messy student enrollment data with missing CGPA, casing anomalies, and duplicate records.</p>
+          </div>
+        </div>
+        <a href="{{ url_for('upload.load_sample') }}" class="btn btn-surface hover:btn-primary shrink-0 flex items-center gap-2 font-medium">
+          <span class="material-symbols-outlined text-[18px]">bolt</span>
+          <span>Load Sample</span>
+        </a>
+      </div>
+
+      <!-- Ingestion Guidelines / Format Support Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+        <div class="bg-surface-container-low p-5 rounded-xl flex flex-col gap-2 border border-border">
+          <div class="flex items-center gap-2 text-secondary">
+            <span class="material-symbols-outlined text-[20px]">table_view</span>
+            <span class="font-headline-sm text-on-surface text-sm">CSV Files</span>
+          </div>
+          <p class="text-body-sm text-on-surface-variant">Automatic comma delimiter parsing and UTF-8 encoding support.</p>
+        </div>
+
+        <div class="bg-surface-container-low p-5 rounded-xl flex flex-col gap-2 border border-border">
+          <div class="flex items-center gap-2 text-secondary">
+            <span class="material-symbols-outlined text-[20px]">description</span>
+            <span class="font-headline-sm text-on-surface text-sm">Excel Workbooks</span>
+          </div>
+          <p class="text-body-sm text-on-surface-variant">Reads XLSX and XLS spreadsheets with first sheet auto-extraction.</p>
+        </div>
+
+        <div class="bg-surface-container-low p-5 rounded-xl flex flex-col gap-2 border border-border">
+          <div class="flex items-center gap-2 text-secondary">
+            <span class="material-symbols-outlined text-[20px]">verified_user</span>
+            <span class="font-headline-sm text-on-surface text-sm">Schema Guard</span>
+          </div>
+          <p class="text-body-sm text-on-surface-variant">Instant type profiling flags malformed rows and missing values.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Storage & Limit Meter (4 cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-space-lg">
+      
+      <!-- Session Storage Card -->
+      <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col gap-4 border border-border">
+        <div class="flex items-center justify-between">
+          <span class="font-headline-sm text-on-surface text-sm">Upload Size Limit</span>
+          <span class="font-code-sm text-body-sm text-on-surface-variant">16.0 MB Max</span>
+        </div>
+        <div class="w-full bg-surface-container-high rounded-full overflow-hidden" style="height: 8px;">
+          <div class="bg-secondary rounded-full" style="height: 100%; width: 25%;"></div>
+        </div>
+        <p class="text-body-sm text-on-surface-variant">
+          Files are processed securely in temporary server storage and isolated per browser session.
+        </p>
+      </div>
+
+      <!-- Quick Tips Card -->
+      <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col gap-3 border border-border">
+        <div class="flex items-center gap-2 text-secondary">
+          <span class="material-symbols-outlined text-[20px]">tips_and_updates</span>
+          <h4 class="font-headline-sm text-on-surface text-sm">Preparation Tips</h4>
+        </div>
+        <ul class="text-body-sm text-on-surface-variant space-y-2" style="padding-left: 1.25rem; line-height: 1.6;">
+          <li>Ensure the first row contains descriptive column header titles.</li>
+          <li>Dates and numerical columns are auto-detected during profiling.</li>
+          <li>You will be able to review all changes before downloading.</li>
+        </ul>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}

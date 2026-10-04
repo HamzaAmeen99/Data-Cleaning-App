@@ -1,0 +1,21 @@
+StudentID,Name,Age,Gender,Email,Department,CGPA,EnrollmentDate
+1001,  Ayesha Khan ,20,Male,ayesha.khan@uni.edu,cs,3.45,2023-09-01
+1002,Bilal Ahmed,22,male,bilal.ahmed@uni.edu,CS ,2.98,2023-09-03
+1003,Sara Malik,21,FEMALE,sara.malik@uni.edu,ECE,3.75,2023-09-05
+1003,Sara Malik,21,FEMALE,sara.malik@uni.edu,ECE,3.75,2023-09-05
+1005,Hassan Raza,,male,hassan.raza@uni.edu,cs,3.1,2023-09-06
+1006,Fatima Noor,23,F,fatima.noor@uni.edu,EEE,,2023-09-08
+1007,Usman Ali,20,Male,usman.ali@uni.edu,ME,2.5,2023-09-10
+1008,Zainab Tariq,21,female,zainab.tariq@uni.edu,CS,3.9,2023-09-12
+1009,Ahmed Shah,24,MALE,not-an-email,Civil,2.2,2023-09-15
+1010,Maryam Yousaf,22,Female,maryam.yousaf@uni.edu,cs,3.05,2023-09-18
+1011,Ali Hassan,19,Male,ali.hassan@uni.edu,CS,3.6,2023-09-20
+1012,Noor e Hira,21,female,noor.hira@uni.edu,ECE,,2023-09-22
+1013, Omar Farooq,23,M,omar.farooq@uni.edu,ME,2.85,2023-09-25
+1014,Ayesha Khan,20,male,ayesha.khan@uni.edu,cs,3.45,2023-09-01
+1015,Imran Qureshi,22,Male,,CS,3.3,2023-09-28
+1016,Hira Shahid,20,F,hira.shahid@uni.edu,EEE,3.55,2023-09-30
+1017,Talha Butt,25,male,talha.butt@uni.edu,Civil,2.1,2023-10-02
+1001,Ayesha Khan,20,Male,ayesha.khan@uni.edu,cs,3.45,2023-09-01
+1019,Sana Ullah,21,FEMALE,sana.ullah@uni.edu,CS,3.2,2023-10-05
+1020,Bilal Ahmed,22,M,bilal.ahmed@uni.edu,CS,,2023-10-08
