@@ -236,13 +236,9 @@ def standardize_categories(
 
     cleaned = df.copy()
     original = cleaned[column]
-    
-    # Also support matching both raw and stripped string forms
-    lookup = dict(clean_mapping)
-    for k, v in clean_mapping.items():
-        lookup[k] = v
 
-    # Replace on both raw and stripped
+    # Replace on both raw and stripped string forms
+    lookup = dict(clean_mapping)
     def _replace_val(val):
         if pd.isna(val):
             return val
@@ -291,10 +287,30 @@ def _describe_value(value) -> str:
     return text if len(text) <= 30 else text[:27] + "..."
 
 
+# Priority order used by apply_cleaning_operations to sort user-selected ops
+# into a stable, logically correct pipeline regardless of form submission order.
+_OP_ORDER = {
+    "drop_columns": 0,
+    "empty_columns": 1,
+    "trim_whitespace": 2,
+    "duplicates": 3,
+    "categories": 4,
+    "case": 5,
+    "missing": 6,
+    "invalid_date": 7,
+    "convert": 8,
+}
+
+
 def apply_cleaning_operations(
     df: pd.DataFrame, operations: list[dict]
 ) -> tuple[pd.DataFrame, list[str]]:
     """Apply a list of user-approved operations in a clean, predictable order.
+
+    Operations are always executed in the canonical 9-step pipeline order
+    defined by ``_OP_ORDER``, regardless of the order in which they were
+    submitted from the HTML form.  This guarantees, for example, that
+    whitespace is trimmed before deduplication so near-duplicates are caught.
 
     Returns:
         (cleaned_df, cleaning_history) where cleaning_history is a list of
@@ -303,18 +319,10 @@ def apply_cleaning_operations(
     cleaned = df.copy()
     history: list[str] = []
 
-    # Sort/group operations logically:
-    # 1. Dropping explicit columns
-    # 2. Dropping all empty columns
-    # 3. Trimming whitespace
-    # 4. Removing duplicates
-    # 5. Category standardization (explicit mappings run before blanket case changes)
-    # 6. Text case standardization
-    # 7. Missing value handling
-    # 8. Date validity cleaning
-    # 9. Type conversion
+    # Sort operations into the canonical pipeline order.
+    sorted_ops = sorted(operations, key=lambda op: _OP_ORDER.get(op.get("type", ""), 99))
 
-    for op in operations:
+    for op in sorted_ops:
         op_type = op.get("type", "")
 
         if op_type == "drop_columns":

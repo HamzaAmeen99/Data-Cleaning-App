@@ -16,6 +16,7 @@ from flask import (
 )
 
 from config import Config
+from utils.csrf import check_csrf
 from services import cleaning_service, file_service
 from utils.validators import validate_column
 
@@ -25,6 +26,7 @@ cleaning_bp = Blueprint("cleaning", __name__)
 @cleaning_bp.route("/clean", methods=["POST"])
 def clean_dataset():
     """Parse the user's selected operations and apply them via the service."""
+    check_csrf()
     working_path = session.get("current_path") or session.get("upload_path")
     if not working_path:
         flash("Please upload a dataset first.", "error")

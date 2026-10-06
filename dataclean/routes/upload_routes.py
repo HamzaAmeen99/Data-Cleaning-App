@@ -5,6 +5,7 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
+from utils.csrf import check_csrf
 from services import file_service
 from utils.validators import validate_file
 
@@ -26,6 +27,7 @@ def upload_page():
 @upload_bp.route("/upload", methods=["POST"])
 def upload_dataset():
     """Receive, validate and store the uploaded file, then go to the overview."""
+    check_csrf()
     file = request.files.get("file")
     filename = validate_file(file)
     if filename is None:

@@ -4,7 +4,11 @@ Run from the dataclean/ directory with:
     flask --app app run --debug
 """
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+import logging
+import secrets
+import warnings
+
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 
 from config import Config
 from routes import cleaning_bp, dataset_bp, upload_bp
@@ -15,6 +19,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    if app.config["SECRET_KEY"] == "dev-key-change-me":
+        warnings.warn(
+            "DataClean is using the default SECRET_KEY. "
+            "Set the DATACLEAN_SECRET_KEY environment variable before deploying.",
+            stacklevel=2,
+        )
+
     _ensure_folders(app)
 
     app.register_blueprint(upload_bp)
@@ -23,9 +34,18 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     _register_error_handlers(app)
 
+    @app.before_request
+    def _seed_csrf_token():
+        """Ensure every session has a CSRF token."""
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_hex(32)
+
     @app.context_processor
-    def inject_app_name():
-        return {"app_name": "DataClean"}
+    def inject_globals():
+        return {
+            "app_name": "DataClean",
+            "csrf_token": session.get("csrf_token", ""),
+        }
 
     @app.template_filter("number_format")
     def number_format(value) -> str:

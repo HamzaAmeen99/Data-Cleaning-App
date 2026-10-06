@@ -74,12 +74,12 @@ def load_dataset(filepath: str | Path) -> pd.DataFrame | None:
     return None
 
 
-def export_dataset(df: pd.DataFrame, filepath: str | Path, file_format: str = "csv") -> Path:
+def export_dataset(df: pd.DataFrame, base_name: str | Path, file_format: str = "csv") -> Path:
     """Save a cleaned DataFrame to the processed directory.
 
     Args:
         df: The cleaned DataFrame.
-        filepath: Base path for the output file (extension is adjusted).
+        base_name: Base filename for the output file (extension is adjusted).
         file_format: "csv" or "excel".
 
     Returns:
@@ -88,11 +88,11 @@ def export_dataset(df: pd.DataFrame, filepath: str | Path, file_format: str = "c
     processed_dir = Path(current_app.config["PROCESSED_FOLDER"])
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    filepath = Path(filepath)
+    base_name = Path(base_name)
     if file_format == "excel":
-        out = processed_dir / f"{filepath.stem}.xlsx"
+        out = processed_dir / f"{base_name.stem}.xlsx"
         df.to_excel(out, index=False)
     else:
-        out = processed_dir / f"{filepath.stem}.csv"
+        out = processed_dir / f"{base_name.stem}.csv"
         df.to_csv(out, index=False)
     return out

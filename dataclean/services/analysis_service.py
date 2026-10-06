@@ -67,7 +67,7 @@ def detect_inconsistent_text(df: pd.DataFrame) -> dict:
 
         unique_vals = sorted(series.unique()) if series.nunique() <= 20 else []
 
-        if whitespace_cells or case_variants or (len(unique_vals) > 1 and case_variants):
+        if whitespace_cells or case_variants:
             findings[str(col)] = {
                 "case_variants": case_variants,
                 "whitespace_cells": whitespace_cells,

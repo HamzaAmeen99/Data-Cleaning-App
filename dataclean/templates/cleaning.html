@@ -43,6 +43,7 @@
   </div>
 
   <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="max-w-7xl mx-auto px-6 lg:px-12 w-full pt-8 flex flex-col gap-8">
 
       <!-- ═══════════════════ QUICK STATS BENTO GRID ═══════════════════ -->
@@ -106,6 +107,48 @@
 
       <!-- ═══════════════════ ACCORDION OPERATIONS CENTER ═══════════════════ -->
       <div class="flex flex-col gap-4">
+
+        {# ── Column Selection & Retention ── #}
+        <div class="accordion-item" id="item-column-selection">
+          <div class="accordion-header" onclick="toggleAccordion('column-selection')">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-lg bg-primary-fixed text-on-primary-fixed flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px]">view_column</span>
+              </div>
+              <div>
+                <h3 class="font-headline-sm text-on-surface">Column Selection &amp; Drop Management</h3>
+                <p class="text-body-sm text-on-surface-variant">Review all {{ columns | length }} dataset columns. Check any columns you wish to drop permanently from the cleaned output.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="px-2.5 py-1 bg-surface-container-high text-on-surface-variant text-label-sm rounded-full font-semibold">{{ columns | length }} Columns</span>
+              <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-column-selection">expand_more</span>
+            </div>
+          </div>
+
+          <div class="accordion-body hidden" id="content-column-selection">
+            <div class="pt-4 flex flex-col gap-4 border-t border-border">
+              <p class="text-body-md text-on-surface-variant">
+                Select columns to exclude/drop. Checked columns will be permanently removed when cleaning operations execute.
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {% for col in columns %}
+                  <label class="p-3 bg-surface rounded-xl border border-border flex items-center justify-between gap-3 cursor-pointer hover:border-error transition-colors">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <input type="checkbox" name="drop_columns" value="{{ col }}" class="mt-0.5 shrink-0" style="accent-color: var(--error); width: 1.1rem; height: 1.1rem; cursor: pointer;">
+                      <div class="min-w-0">
+                        <strong class="font-semibold text-on-surface text-body-md truncate block" title="{{ col }}">{{ col }}</strong>
+                        <span class="text-xs text-outline font-code-sm">{{ column_types.get(col, 'general') }}</span>
+                      </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-xs font-code-sm font-semibold bg-error-container text-error shrink-0">Drop</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {% for s in suggestions %}
 
           {# ── Missing Values ── #}

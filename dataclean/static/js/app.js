@@ -29,16 +29,18 @@ function toggleAccordion(id) {
   }
 }
 
-// Show the chosen filename on the upload box and enable the submit button.
+// Hide the dropzone and reveal the file-state-card when a file is chosen.
+// The browse button and dropzone are disabled so clicking cannot trigger a picker.
 function setupUploadFeedback() {
   const input = document.getElementById("file-input");
-  const uploadText = document.getElementById("upload-text");
-  const uploadButton = document.getElementById("upload-btn");
+  const dropzone = document.getElementById("dropzone");
+  const browseBtn = document.getElementById("browse-btn");
   const fileStateCard = document.getElementById("file-state-card");
   const fileNameDisplay = document.getElementById("file-name");
   const fileMetaDisplay = document.getElementById("file-meta");
   const form = document.getElementById("upload-form");
-  const dropzone = document.getElementById("dropzone");
+  const uploadButton = document.getElementById("upload-btn");
+  const changeFileBtn = document.getElementById("change-file-btn");
 
   if (!input) return;
 
@@ -46,34 +48,42 @@ function setupUploadFeedback() {
     if (!file) return;
     const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
 
-    if (uploadText) {
-      uploadText.textContent = `${file.name} (${sizeMb} MB)`;
-    }
+    if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+    if (fileMetaDisplay) fileMetaDisplay.textContent = sizeMb + " MB • Ready for Ingestion";
 
-    if (fileNameDisplay) {
-      fileNameDisplay.textContent = file.name;
+    // Completely lock and hide dropzone and browse option
+    if (dropzone) {
+      dropzone.style.display = "none";
+      dropzone.classList.add("hidden");
     }
-
-    if (fileMetaDisplay) {
-      fileMetaDisplay.textContent = `${sizeMb} MB • Ready for Ingestion`;
+    if (browseBtn) {
+      browseBtn.disabled = true;
+      browseBtn.style.pointerEvents = "none";
     }
-
     if (fileStateCard) {
       fileStateCard.classList.remove("hidden");
     }
-
     if (uploadButton) {
       uploadButton.disabled = false;
     }
   };
 
-  input.addEventListener("change", () => {
-    if (input.files.length > 0) {
-      handleFile(input.files[0]);
-    }
-  });
+  // Wire browse button to trigger file input
+  if (browseBtn) {
+    browseBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      input.click();
+    });
+  }
 
+  // Clicking anywhere in the dropzone (when active) triggers file input
   if (dropzone) {
+    dropzone.addEventListener("click", () => {
+      if (dropzone.style.display !== "none" && !dropzone.classList.contains("hidden")) {
+        input.click();
+      }
+    });
+
     ["dragenter", "dragover"].forEach((event) => {
       dropzone.addEventListener(event, (e) => {
         e.preventDefault();
@@ -85,21 +95,57 @@ function setupUploadFeedback() {
       dropzone.addEventListener(event, (e) => {
         e.preventDefault();
         dropzone.classList.remove("dragover");
-        if (event === "drop" && e.dataTransfer.files.length > 0) {
+        if (event === "drop" && e.dataTransfer && e.dataTransfer.files.length > 0) {
           input.files = e.dataTransfer.files;
-          handleFile(input.files[0]);
+          handleFile(e.dataTransfer.files[0]);
         }
       });
     });
   }
 
+  input.addEventListener("change", () => {
+    if (input.files.length > 0) handleFile(input.files[0]);
+  });
+
+  // When form submits, freeze all buttons to prevent double-clicks
   if (form) {
     form.addEventListener("submit", () => {
       if (uploadButton) {
         uploadButton.disabled = true;
-        uploadButton.innerHTML = `<span class="material-symbols-outlined text-[18px]">sync</span> Uploading & Analyzing…`;
+        uploadButton.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span><span>Uploading &amp; Analyzing Dataset...</span>';
+      }
+      if (changeFileBtn) {
+        changeFileBtn.disabled = true;
+        changeFileBtn.style.pointerEvents = "none";
+      }
+      if (browseBtn) {
+        browseBtn.disabled = true;
       }
     });
+  }
+}
+
+// Restore the dropzone and open the file picker (called by "Change" button).
+function resetDropzone() {
+  const dropzone = document.getElementById("dropzone");
+  const browseBtn = document.getElementById("browse-btn");
+  const fileStateCard = document.getElementById("file-state-card");
+  const input = document.getElementById("file-input");
+
+  if (dropzone) {
+    dropzone.style.display = "";
+    dropzone.classList.remove("hidden");
+  }
+  if (browseBtn) {
+    browseBtn.disabled = false;
+    browseBtn.style.pointerEvents = "auto";
+  }
+  if (fileStateCard) {
+    fileStateCard.classList.add("hidden");
+  }
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.click(), 50);
   }
 }
 
@@ -163,7 +209,7 @@ function setupMultiColumnConversion() {
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "btn btn-sm btn-outline remove-row-btn";
-      removeBtn.innerHTML = "✕";
+      removeBtn.innerHTML = "x";
       removeBtn.title = "Remove this conversion";
       removeBtn.addEventListener("click", () => newRow.remove());
       newRow.appendChild(removeBtn);
@@ -194,7 +240,7 @@ function setupActiveOperationsCount() {
     });
 
     if (countDisplay) {
-      countDisplay.textContent = `${count} active operation(s) configured`;
+      countDisplay.textContent = count + " active operation(s) configured";
     }
   };
 

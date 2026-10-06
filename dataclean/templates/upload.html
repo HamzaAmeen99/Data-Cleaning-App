@@ -36,9 +36,11 @@
       
       <!-- Upload Form with Dropzone -->
       <form id="upload-form" action="{{ url_for('upload.upload_dataset') }}" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="file" id="file-input" name="file" accept=".csv,.xlsx,.xls" class="hidden" aria-label="Upload CSV or Excel file">
         
-        <label for="file-input" class="dropzone-box" id="dropzone">
+        <!-- Dropzone (hidden once file is selected) -->
+        <div class="dropzone-box" id="dropzone">
           <div class="dropzone-icon-wrap">
             <span class="material-symbols-outlined text-[32px]">cloud_upload</span>
           </div>
@@ -47,10 +49,8 @@
           <p class="text-on-surface-variant text-body-md mb-4">Supports .CSV, .XLSX, .XLS up to 16MB</p>
 
           <div class="flex items-center gap-3">
-            <button type="button" class="btn btn-dark" onclick="document.getElementById('file-input').click()">
-              Browse Files
-            </button>
-            <span class="text-outline text-body-sm">or click anywhere in box</span>
+            <button type="button" class="btn btn-dark" id="browse-btn">Browse Files</button>
+            <span class="text-outline text-body-sm">or drag and drop into this box</span>
           </div>
 
           <div class="file-format-pills">
@@ -66,10 +66,10 @@
             </div>
             <span class="font-code-sm">Max limit: 16 MB</span>
           </div>
-        </label>
+        </div>
 
-        <!-- Selected File State Card (Hidden by default, shown when file selected) -->
-        <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col gap-4 mt-6 border border-border hidden" id="file-state-card">
+        <!-- Selected File State Card (hidden until file is chosen) -->
+        <div class="bg-surface-container-low rounded-xl p-6 shadow-sm flex flex-col gap-4 border border-border hidden" id="file-state-card">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-secondary text-[24px]">task_alt</span>
@@ -86,6 +86,13 @@
               <h5 class="font-headline-sm text-on-surface truncate text-sm" id="file-name">Selected File</h5>
               <p class="text-body-sm text-on-surface-variant" id="file-meta">Ready for processing</p>
             </div>
+            <!-- Change file link re-enables the dropzone -->
+            <button type="button" id="change-file-btn"
+              class="btn btn-sm btn-surface flex items-center gap-1 shrink-0"
+              onclick="resetDropzone()">
+              <span class="material-symbols-outlined text-[14px]">swap_horiz</span>
+              <span>Change</span>
+            </button>
           </div>
 
           <button type="submit" class="btn btn-lg btn-primary w-full shadow-md flex items-center justify-center gap-2" id="upload-btn">
