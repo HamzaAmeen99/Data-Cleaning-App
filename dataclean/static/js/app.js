@@ -7,7 +7,31 @@ document.addEventListener("DOMContentLoaded", () => {
   setupMultiColumnConversion();
   setupDestructiveConfirm();
   setupActiveOperationsCount();
+  setupFlashAutoDismiss();
 });
+
+// Auto-dismiss flash messages after a delay (errors stay a bit longer).
+function setupFlashAutoDismiss() {
+  document.querySelectorAll(".flash-message").forEach((el) => {
+    const delay = el.classList.contains("flash-error") ? 6000 : 4000;
+
+    setTimeout(() => {
+      // Skip if the user already closed it with the ✕ button
+      if (!el.isConnected) return;
+
+      el.style.transition = "opacity .5s";
+      el.style.opacity = "0";
+
+      setTimeout(() => {
+        const container = el.parentElement;
+        el.remove();
+        if (container && container.classList.contains("flash-container") && !container.children.length) {
+          container.remove();
+        }
+      }, 500);
+    }, delay);
+  });
+}
 
 // Accordion toggle helper for Cleaning Operations
 function toggleAccordion(id) {

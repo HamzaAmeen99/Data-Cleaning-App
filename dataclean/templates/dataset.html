@@ -9,25 +9,31 @@
     <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <div class="flex items-center gap-2 mb-1">
-          <span class="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-container text-label-sm uppercase tracking-wider font-semibold">Active Workspace</span>
+          <span
+            class="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-container text-label-sm uppercase tracking-wider font-semibold">Active
+            Workspace</span>
           <span class="text-outline text-body-sm">/</span>
           <span class="text-on-surface-variant text-body-sm font-code-sm font-medium">{{ filename }}</span>
           {% if is_cleaned %}
-            <span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-semibold">Cleaned</span>
+          <span
+            class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-semibold">Cleaned</span>
           {% else %}
-            <span class="px-2 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold">Raw Upload</span>
+          <span class="px-2 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold">Raw
+            Upload</span>
           {% endif %}
         </div>
         <h1 class="font-headline-lg text-on-surface tracking-tight">Dataset Health &amp; Column Explorer</h1>
       </div>
       <div class="flex items-center gap-3">
         {% if is_cleaned %}
-          <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2" onclick="return confirm('Revert back to the uncleaned raw upload?')">
-            <span class="material-symbols-outlined text-[18px]">history</span>
-            <span>Reset to Original</span>
-          </a>
+        <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2"
+          onclick="return confirm('Revert back to the uncleaned raw upload?')">
+          <span class="material-symbols-outlined text-[18px]">history</span>
+          <span>Reset to Original</span>
+        </a>
         {% endif %}
-        <button type="button" class="btn btn-primary flex items-center gap-2 shadow-sm" onclick="document.getElementById('col-select-form').submit()">
+        <button type="button" class="btn btn-primary flex items-center gap-2 shadow-sm"
+          onclick="document.getElementById('col-select-form').submit()">
           <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
           <span>Configure Cleaning Operations</span>
         </button>
@@ -43,7 +49,8 @@
         <div class="glow-blob bg-secondary-soft"></div>
         <div class="flex justify-between items-start mb-4">
           <span class="text-on-surface-variant text-label-md font-medium">Total Rows</span>
-          <div class="kpi-icon-wrap bg-secondary-fixed text-secondary"><span class="material-symbols-outlined text-[20px]">table_rows</span></div>
+          <div class="kpi-icon-wrap bg-secondary-fixed text-secondary"><span
+              class="material-symbols-outlined text-[20px]">table_rows</span></div>
         </div>
         <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.rows | number_format }}</div>
         <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
@@ -55,7 +62,8 @@
         <div class="glow-blob bg-primary-fixed"></div>
         <div class="flex justify-between items-start mb-4">
           <span class="text-on-surface-variant text-label-md font-medium">Columns</span>
-          <div class="kpi-icon-wrap bg-primary-fixed text-primary"><span class="material-symbols-outlined text-[20px]">view_column</span></div>
+          <div class="kpi-icon-wrap bg-primary-fixed text-primary"><span
+              class="material-symbols-outlined text-[20px]">view_column</span></div>
         </div>
         <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.columns }}</div>
         <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
@@ -67,11 +75,16 @@
         <div class="glow-blob bg-error-container"></div>
         <div class="flex justify-between items-start mb-4">
           <span class="text-on-surface-variant text-label-md font-medium">Missing Values</span>
-          <div class="kpi-icon-wrap bg-error-container text-error"><span class="material-symbols-outlined text-[20px]">warning</span></div>
+          <div class="kpi-icon-wrap bg-error-container text-error"><span
+              class="material-symbols-outlined text-[20px]">warning</span></div>
         </div>
-        <div class="font-headline-lg {% if total_missing > 0 %}text-error{% else %}text-on-surface{% endif %} tracking-tight mb-1">{{ total_missing | number_format }}</div>
-        <div class="flex items-center gap-1.5 {% if total_missing > 0 %}text-error{% else %}text-on-surface-variant{% endif %} text-body-sm font-medium">
-          <span class="material-symbols-outlined text-[16px]">{% if total_missing > 0 %}error{% else %}check_circle{% endif %}</span>
+        <div
+          class="font-headline-lg {% if total_missing > 0 %}text-error{% else %}text-on-surface{% endif %} tracking-tight mb-1">
+          {{ total_missing | number_format }}</div>
+        <div
+          class="flex items-center gap-1.5 {% if total_missing > 0 %}text-error{% else %}text-on-surface-variant{% endif %} text-body-sm font-medium">
+          <span class="material-symbols-outlined text-[16px]">{% if total_missing > 0 %}error{% else %}check_circle{%
+            endif %}</span>
           <span>{% if total_missing > 0 %}Requires imputation or drop{% else %}No null values detected{% endif %}</span>
         </div>
       </div>
@@ -79,22 +92,30 @@
         <div class="glow-blob bg-warning-container"></div>
         <div class="flex justify-between items-start mb-4">
           <span class="text-on-surface-variant text-label-md font-medium">Duplicates</span>
-          <div class="kpi-icon-wrap bg-tertiary-fixed text-on-tertiary-fixed"><span class="material-symbols-outlined text-[20px]">content_copy</span></div>
+          <div class="kpi-icon-wrap bg-tertiary-fixed text-on-tertiary-fixed"><span
+              class="material-symbols-outlined text-[20px]">content_copy</span></div>
         </div>
-        <div class="font-headline-lg {% if duplicates > 0 %}text-warning{% else %}text-on-surface{% endif %} tracking-tight mb-1">{{ duplicates | number_format }}</div>
+        <div
+          class="font-headline-lg {% if duplicates > 0 %}text-warning{% else %}text-on-surface{% endif %} tracking-tight mb-1">
+          {{ duplicates | number_format }}</div>
         <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm font-medium">
-          <span class="material-symbols-outlined text-[16px]">{% if duplicates > 0 %}difference{% else %}done{% endif %}</span>
+          <span class="material-symbols-outlined text-[16px]">{% if duplicates > 0 %}difference{% else %}done{% endif
+            %}</span>
           <span>{% if duplicates > 0 %}Identical records detected{% else %}Zero duplicates found{% endif %}</span>
         </div>
       </div>
     </div>
 
     <!-- Column Selection Panel -->
-    <div class="bg-surface-container-lowest rounded-xl border border-border shadow-sm overflow-hidden" id="column-selection-section">
-      <div class="p-6 border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="bg-surface-container-lowest rounded-xl border border-border shadow-sm overflow-hidden"
+      id="column-selection-section">
+      <div
+        class="p-6 border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded bg-secondary-soft text-secondary text-label-sm font-semibold font-code-sm">Step 02 / Schema</span>
+            <span
+              class="px-2 py-0.5 rounded bg-secondary-soft text-secondary text-label-sm font-semibold font-code-sm">Step
+              02 / Schema</span>
             <span class="text-outline text-body-sm">•</span>
             <span class="text-on-surface-variant text-body-sm font-medium">Column Filtering</span>
           </div>
@@ -107,13 +128,17 @@
           </p>
         </div>
         <div class="flex items-center gap-3 shrink-0 flex-wrap">
-          <button type="button" id="col-select-all" class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
+          <button type="button" id="col-select-all"
+            class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
             <span class="material-symbols-outlined text-[16px]">select_all</span><span>Select All</span>
           </button>
-          <button type="button" id="col-deselect-all" class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
+          <button type="button" id="col-deselect-all"
+            class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
             <span class="material-symbols-outlined text-[16px]">deselect</span><span>Deselect All</span>
           </button>
-          <span class="px-3 py-1 rounded-full bg-surface-container-high text-on-surface font-code-sm text-xs font-semibold" id="col-selection-count">
+          <span
+            class="px-3 py-1 rounded-full bg-surface-container-high text-on-surface font-code-sm text-xs font-semibold"
+            id="col-selection-count">
             {{ overview.columns }} / {{ overview.columns }} selected
           </span>
         </div>
@@ -123,50 +148,56 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="col-select-grid">
           {% for col in column_info %}
-            {% set miss = col.missing %}
-            {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
-            <div class="col-select-card {% if col.selected %}selected{% else %}deselected{% endif %}"
-                 id="col-card-{{ loop.index }}"
-                 data-col="{{ col.name }}"
-                 onclick="toggleColumnSelection('{{ loop.index }}')">
-              
-              <!-- Checkbox input -->
-              <input type="checkbox" name="selected_columns" value="{{ col.name }}"
-                     class="col-checkbox"
-                     id="col-input-{{ loop.index }}"
-                     {% if col.selected %}checked{% endif %}
-                     onclick="event.stopPropagation(); updateColumnState('{{ loop.index }}');"
-                     style="margin-top: 2px; width: 1.15rem; height: 1.15rem; accent-color: var(--secondary); cursor: pointer;">
-              
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-2 mb-1.5">
-                  <span class="font-semibold text-on-surface text-body-md truncate" title="{{ col.name }}">{{ col.name }}</span>
-                  <span class="px-2 py-0.5 rounded text-xs font-code-sm bg-surface-container-high text-on-surface-variant shrink-0 font-medium">{{ col.type }}</span>
-                </div>
+          {% set miss = col.missing %}
+          {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
+          <div class="col-select-card {% if col.selected %}selected{% else %}deselected{% endif %}"
+            id="col-card-{{ loop.index }}" data-col="{{ col.name }}"
+            onclick="toggleColumnSelection('{{ loop.index }}')">
 
-                <div class="w-full bg-surface-container-high rounded-full overflow-hidden mb-1.5" style="height: 5px;">
-                  <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full" style="height: 100%; width: {{ rate }}%;"></div>
-                </div>
+            <!-- Checkbox input -->
+            <input type="checkbox" name="selected_columns" value="{{ col.name }}" class="col-checkbox"
+              id="col-input-{{ loop.index }}" {% if col.selected %}checked{% endif %}
+              onclick="event.stopPropagation(); updateColumnState('{{ loop.index }}');"
+              style="margin-top: 2px; width: 1.15rem; height: 1.15rem; accent-color: var(--secondary); cursor: pointer;">
 
-                <div class="flex justify-between items-center text-xs text-on-surface-variant font-code-sm">
-                  <span>{{ "%.0f" | format(rate) }}% filled</span>
-                  <span class="col-status-pill px-1.5 py-0.2 rounded font-semibold {% if col.selected %}text-secondary{% else %}text-outline{% endif %}" id="col-status-{{ loop.index }}">
-                    {% if col.selected %}Included{% else %}Dropped{% endif %}
-                  </span>
-                </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <span class="font-semibold text-on-surface text-body-md truncate" title="{{ col.name }}">{{ col.name
+                  }}</span>
+                <span
+                  class="px-2 py-0.5 rounded text-xs font-code-sm bg-surface-container-high text-on-surface-variant shrink-0 font-medium">{{
+                  col.type }}</span>
+              </div>
+
+              <div class="w-full bg-surface-container-high rounded-full overflow-hidden mb-1.5" style="height: 5px;">
+                <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full"
+                  style="height: 100%; width: {{ rate }}%;"></div>
+              </div>
+
+              <div class="flex justify-between items-center text-xs text-on-surface-variant font-code-sm">
+                <span>{{ "%.0f" | format(rate) }}% filled</span>
+                <span
+                  class="col-status-pill px-1.5 py-0.2 rounded font-semibold {% if col.selected %}text-secondary{% else %}text-outline{% endif %}"
+                  id="col-status-{{ loop.index }}">
+                  {% if col.selected %}Included{% else %}Dropped{% endif %}
+                </span>
               </div>
             </div>
+          </div>
           {% endfor %}
         </div>
 
-        <div class="px-6 py-4 border-t border-border bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div
+          class="px-6 py-4 border-t border-border bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-4">
           <p class="text-body-sm text-on-surface-variant">
             <span class="material-symbols-outlined text-[16px] align-middle text-secondary">info</span>
-            Choose columns above, then click <strong>Apply Selection &amp; Continue</strong> to enter the cleaning pipeline.
+            Choose columns above, then click <strong>Apply Selection &amp; Continue</strong> to enter the cleaning
+            pipeline.
           </p>
           <div class="flex items-center gap-3 shrink-0">
-            <a href="{{ url_for('dataset.dataset_analysis') }}" class="btn btn-surface">Keep All &amp; Skip</a>
-            <button type="submit" class="btn btn-primary flex items-center gap-2 shadow-sm font-semibold" id="col-apply-btn">
+            <button type="button" class="btn btn-surface" id="col-keep-all-btn">Keep All &amp; Skip</button>
+            <button type="submit" class="btn btn-primary flex items-center gap-2 shadow-sm font-semibold"
+              id="col-apply-btn">
               <span class="material-symbols-outlined text-[18px]">check_circle</span>
               <span>Apply Selection &amp; Continue</span>
             </button>
@@ -179,14 +210,18 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
       <!-- Data Preview Table -->
-      <div class="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col border border-border overflow-hidden">
-        <div class="p-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border">
+      <div
+        class="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col border border-border overflow-hidden">
+        <div
+          class="p-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border">
           <div>
             <h2 class="font-headline-sm text-on-surface">Interactive Data Preview</h2>
-            <p class="text-on-surface-variant text-body-sm mt-0.5">Showing first {{ preview_shown }} of {{ total_rows | number_format }} rows</p>
+            <p class="text-on-surface-variant text-body-sm mt-0.5">Showing first {{ preview_shown }} of {{ total_rows |
+              number_format }} rows</p>
           </div>
           <div class="relative w-full sm:w-64">
-            <input class="input-styled" id="preview-search" placeholder="Filter preview rows..." type="text" aria-label="Filter preview rows"/>
+            <input class="input-styled" id="preview-search" placeholder="Filter preview rows..." type="text"
+              aria-label="Filter preview rows" />
           </div>
         </div>
         <div class="table-container">
@@ -199,19 +234,22 @@
             </thead>
             <tbody>
               {% for row in preview_values %}
-                <tr>
-                  <td class="text-outline font-code-sm">{{ loop.index }}</td>
-                  {% for value in row %}
-                    <td>{% if value is none %}<span class="null-pill" title="Missing value">null</span>{% else %}{{ value }}{% endif %}</td>
-                  {% endfor %}
-                </tr>
+              <tr>
+                <td class="text-outline font-code-sm">{{ loop.index }}</td>
+                {% for value in row %}
+                <td>{% if value is none %}<span class="null-pill" title="Missing value">null</span>{% else %}{{ value
+                  }}{% endif %}</td>
+                {% endfor %}
+              </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-        <div class="p-4 bg-surface-container-low flex justify-between items-center text-body-sm text-on-surface-variant border-t border-border">
+        <div
+          class="p-4 bg-surface-container-low flex justify-between items-center text-body-sm text-on-surface-variant border-t border-border">
           <span>Showing 1 to {{ preview_shown }} of {{ total_rows | number_format }} rows</span>
-          <button type="button" class="btn btn-sm btn-primary flex items-center gap-1.5" onclick="document.getElementById('col-select-form').submit()">
+          <button type="button" class="btn btn-sm btn-primary flex items-center gap-1.5"
+            onclick="document.getElementById('col-select-form').submit()">
             <span class="material-symbols-outlined text-[16px]">check_circle</span>
             <span>Apply Selection &amp; Continue</span>
           </button>
@@ -219,47 +257,56 @@
       </div>
 
       <!-- Column Completeness Sidebar -->
-      <div class="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-sm p-6 flex flex-col justify-between border border-border">
+      <div
+        class="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-sm p-6 flex flex-col justify-between border border-border">
         <div>
           <div class="flex justify-between items-center mb-6">
             <h2 class="font-headline-sm text-on-surface">Column Information</h2>
-            <span class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-xs font-semibold">{{ overview.columns }} columns</span>
+            <span
+              class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-xs font-semibold">{{
+              overview.columns }} columns</span>
           </div>
           <div class="flex flex-col gap-4" style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
             {% for col in column_info %}
-              {% set miss = col.missing %}
-              {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
-              <div class="flex flex-col gap-1.5 p-3 rounded-lg bg-surface-container-low border border-border" id="sidebar-col-{{ loop.index }}">
-                <div class="flex justify-between items-center text-body-md">
-                  <span class="font-medium text-on-surface flex items-center gap-2">
-                    <span style="width:8px;height:8px;border-radius:50%;display:inline-block;" class="{% if rate < 80 %}bg-error{% else %}bg-tertiary-fixed{% endif %}"></span>
-                    <strong>{{ col.name }}</strong>
-                  </span>
-                  <span class="font-code-sm {% if miss > 0 %}text-error{% else %}text-on-surface-variant{% endif %} font-medium">{{ "%.1f" | format(rate) }}%</span>
-                </div>
-                <div class="w-full bg-surface-container-high rounded-full overflow-hidden" style="height: 6px;">
-                  <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full" style="height: 100%; width: {{ rate }}%;"></div>
-                </div>
-                <div class="flex justify-between items-center text-body-sm text-on-surface-variant mt-1">
-                  <span class="font-code-sm text-xs text-outline">{{ col.type }}</span>
-                  {% if miss > 0 %}
-                    <span class="text-error font-code-sm text-xs">{{ miss | number_format }} missing</span>
-                  {% else %}
-                    <span class="text-tertiary-container font-code-sm text-xs">Complete</span>
-                  {% endif %}
-                </div>
+            {% set miss = col.missing %}
+            {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
+            <div class="flex flex-col gap-1.5 p-3 rounded-lg bg-surface-container-low border border-border"
+              id="sidebar-col-{{ loop.index }}">
+              <div class="flex justify-between items-center text-body-md">
+                <span class="font-medium text-on-surface flex items-center gap-2">
+                  <span style="width:8px;height:8px;border-radius:50%;display:inline-block;"
+                    class="{% if rate < 80 %}bg-error{% else %}bg-tertiary-fixed{% endif %}"></span>
+                  <strong>{{ col.name }}</strong>
+                </span>
+                <span
+                  class="font-code-sm {% if miss > 0 %}text-error{% else %}text-on-surface-variant{% endif %} font-medium">{{
+                  "%.1f" | format(rate) }}%</span>
               </div>
+              <div class="w-full bg-surface-container-high rounded-full overflow-hidden" style="height: 6px;">
+                <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full"
+                  style="height: 100%; width: {{ rate }}%;"></div>
+              </div>
+              <div class="flex justify-between items-center text-body-sm text-on-surface-variant mt-1">
+                <span class="font-code-sm text-xs text-outline">{{ col.type }}</span>
+                {% if miss > 0 %}
+                <span class="text-error font-code-sm text-xs">{{ miss | number_format }} missing</span>
+                {% else %}
+                <span class="text-tertiary-container font-code-sm text-xs">Complete</span>
+                {% endif %}
+              </div>
+            </div>
             {% endfor %}
           </div>
         </div>
         <div class="mt-6 pt-4 border-t border-border flex flex-col gap-3">
           {% if total_missing > 0 %}
-            <div class="flex items-center justify-between text-body-sm text-on-surface-variant">
-              <span>Missing Values Alert</span>
-              <span class="text-error font-medium">{{ total_missing | number_format }} cells need fixes</span>
-            </div>
+          <div class="flex items-center justify-between text-body-sm text-on-surface-variant">
+            <span>Missing Values Alert</span>
+            <span class="text-error font-medium">{{ total_missing | number_format }} cells need fixes</span>
+          </div>
           {% endif %}
-          <button type="button" class="btn btn-primary w-full flex items-center justify-center gap-2" onclick="document.getElementById('col-select-form').submit()">
+          <button type="button" class="btn btn-primary w-full flex items-center justify-center gap-2"
+            onclick="document.getElementById('col-select-form').submit()">
             <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
             <span>Configure Cleaning Options</span>
           </button>
@@ -275,6 +322,8 @@
     var card = document.getElementById("col-card-" + index);
     var input = document.getElementById("col-input-" + index);
     var status = document.getElementById("col-status-" + index);
+    var keepAllBtn = document.getElementById("col-keep-all-btn");
+
     if (!card || !input) return;
 
     if (input.checked) {
@@ -292,6 +341,18 @@
         status.className = "col-status-pill px-1.5 py-0.2 rounded font-semibold text-outline";
       }
     }
+
+    if (keepAllBtn) {
+      keepAllBtn.addEventListener("click", function () {
+        if (!grid) return;
+        grid.querySelectorAll(".col-checkbox").forEach(function (cb, idx) {
+          cb.checked = true;
+          updateColumnState(idx + 1);
+        });
+        document.getElementById("col-select-form").submit();
+      });
+    }
+
     updateAllCounts();
   }
 
