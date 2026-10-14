@@ -10,7 +10,144 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFlashAutoDismiss();
   setupThemeToggle();
   setupMobileNavigation();
+  setupSessionEnding();
+  setupLoadingScreen();
 });
+
+let sessionEnding = false;
+let internalSessionNavigation = false;
+
+function setupSessionEnding() {
+  if (document.body.dataset.sessionActive !== "true") return;
+
+  const modal = document.getElementById("end-session-modal");
+  const openButton = document.getElementById("end-session-btn");
+  const closeButton = document.getElementById("end-session-close");
+  const cancelButton = document.getElementById("end-session-cancel");
+  const endForm = document.getElementById("end-session-form");
+
+  const openModal = () => {
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    if (cancelButton) cancelButton.focus();
+  };
+
+  const closeModal = () => {
+    if (!modal) return;
+    modal.classList.add("hidden");
+    if (openButton) openButton.focus();
+  };
+
+  if (openButton) openButton.addEventListener("click", openModal);
+  if (closeButton) closeButton.addEventListener("click", closeModal);
+  if (cancelButton) cancelButton.addEventListener("click", closeModal);
+  if (modal) {
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal();
+    });
+  }
+  if (endForm) {
+    endForm.addEventListener("submit", () => {
+      sessionEnding = true;
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
+      closeModal();
+    }
+  });
+
+  const markInternalNavigation = () => {
+    internalSessionNavigation = true;
+  };
+
+  document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element
+      ? event.target.closest("a[href]")
+      : null;
+    if (!link) return;
+    const destination = new URL(link.href, window.location.href);
+    if (destination.origin === window.location.origin) markInternalNavigation();
+  }, true);
+
+  document.addEventListener("submit", (event) => {
+    if (event.target !== endForm && !event.defaultPrevented) markInternalNavigation();
+  });
+
+  window.addEventListener("pageshow", () => {
+    sessionEnding = false;
+    internalSessionNavigation = false;
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (sessionEnding || internalSessionNavigation) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
+  window.addEventListener("pagehide", (event) => {
+    if (event.persisted || sessionEnding || internalSessionNavigation) return;
+    sessionEnding = true;
+
+    const formData = new FormData();
+    formData.append("csrf_token", document.body.dataset.csrfToken || "");
+    formData.append("beacon", "1");
+    const url = document.body.dataset.endSessionUrl;
+
+    if (navigator.sendBeacon && navigator.sendBeacon(url, formData)) return;
+    fetch(url, {
+      method: "POST",
+      body: formData,
+      credentials: "same-origin",
+      keepalive: true,
+    }).catch(() => {});
+  });
+}
+
+function setupLoadingScreen() {
+  const screen = document.getElementById("app-loading-screen");
+  if (!screen) return;
+
+  const title = document.getElementById("app-loading-title");
+  const message = document.getElementById("app-loading-message");
+  const forms = document.querySelectorAll("form[data-loading-title]");
+
+  const reset = () => {
+    screen.classList.add("hidden");
+    screen.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("is-processing");
+    document.body.removeAttribute("aria-busy");
+    forms.forEach((form) => delete form.dataset.submitting);
+  };
+
+  forms.forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) return;
+      if (form.dataset.submitting === "true") {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      form.dataset.submitting = "true";
+      if (title) title.textContent = form.dataset.loadingTitle;
+      if (message) message.textContent = form.dataset.loadingMessage;
+      screen.classList.remove("hidden");
+      screen.setAttribute("aria-hidden", "false");
+      document.body.classList.add("is-processing");
+      document.body.setAttribute("aria-busy", "true");
+      internalSessionNavigation = true;
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
+        button.disabled = true;
+      });
+
+      window.setTimeout(() => HTMLFormElement.prototype.submit.call(form), 80);
+    });
+  });
+
+  window.addEventListener("pageshow", reset);
+}
 
 function setupMobileNavigation() {
   const button = document.getElementById("mobile-menu-btn");

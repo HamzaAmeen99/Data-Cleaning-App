@@ -2,6 +2,9 @@
 
 from flask import session
 
+from services import file_service
+from services.cleaning_service import convert_column_type
+
 
 class DatasetSession:
     """Reads and writes the dataset session keys so routes never duplicate them."""
@@ -28,6 +31,17 @@ class DatasetSession:
             )
         )
 
+    @property
+    def column_type_overrides(self) -> dict[str, str]:
+        return session.get("column_type_overrides", {})
+
+    def apply_column_types(self, df):
+        """Reapply user-selected types after loading an intermediate CSV."""
+        converted = df
+        for column, target_type in self.column_type_overrides.items():
+            converted, _ = convert_column_type(converted, column, target_type)
+        return converted
+
     def start_new(self, path: str, filename: str) -> None:
         """Register a fresh upload and discard any previous dataset's state."""
         session["upload_path"] = str(path)
@@ -39,7 +53,21 @@ class DatasetSession:
         session["current_path"] = session["upload_path"]
         session.pop("processed_path", None)
         session.pop("selected_columns", None)
+        session.pop("column_type_overrides", None)
         session["cleaning_history"] = []
+
+    def end(self) -> None:
+        """Delete files owned by the active session and clear its state."""
+        paths = {
+            session.get("upload_path"),
+            session.get("current_path"),
+            session.get("processed_path"),
+            session.get("excel_path"),
+        }
+        for path in paths:
+            if path:
+                file_service.delete_file(path)
+        session.clear()
 
 
 dataset_session = DatasetSession()

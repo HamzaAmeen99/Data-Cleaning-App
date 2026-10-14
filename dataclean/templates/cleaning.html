@@ -23,7 +23,9 @@
     </div>
   </div>
 
-  <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form">
+  <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form"
+    data-loading-title="Cleaning your dataset"
+    data-loading-message="Applying the selected operations and preparing your updated preview.">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
     <!-- Quick Stats -->

@@ -3,7 +3,7 @@
 import pandas as pd
 from config import Config
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
-from services import analysis_service, file_service
+from services import analysis_service, cleaning_service, file_service
 from services.dataset_session import dataset_session
 from utils.csrf import check_csrf
 
@@ -15,7 +15,8 @@ def _load_current_dataset() -> pd.DataFrame | None:
     path = dataset_session.working_path
     if not path:
         return None
-    return file_service.load_dataset(path)
+    df = file_service.load_dataset(path)
+    return dataset_session.apply_column_types(df) if df is not None else None
 
 
 @dataset_bp.route("/dataset")
@@ -23,8 +24,25 @@ def show_dataset():
     """Display filename, shape, preview and per-column information."""
     df = _load_current_dataset()
     if df is None:
+        if dataset_session.working_path:
+            csrf_token = session.get("csrf_token")
+            dataset_session.end()
+            if csrf_token:
+                session["csrf_token"] = csrf_token
+            flash(
+                "We couldn't read this file. Please make sure it is a valid CSV or Excel file.",
+                "error",
+            )
+            return redirect(url_for("upload.upload_page"))
         flash("Please upload a dataset first.", "error")
-        return redirect(url_for("upload.index"))
+        return redirect(url_for("upload.upload_page"))
+    if df.empty:
+        csrf_token = session.get("csrf_token")
+        dataset_session.end()
+        if csrf_token:
+            session["csrf_token"] = csrf_token
+        flash("This file contains no data rows. Please upload a dataset with data.", "error")
+        return redirect(url_for("upload.upload_page"))
 
     overview = analysis_service.get_dataset_overview(df)
     missing = analysis_service.get_missing_values(df)
@@ -79,8 +97,14 @@ def dataset_analysis():
 
     # Details needed by the operation controls on the cleaning page.
     missing = analysis["missing_values"]
+    type_labels = {
+        "Number": "numeric",
+        "Date": "date",
+        "Yes/No": "boolean",
+        "Text": "text",
+    }
     column_types = {
-        col: ("numeric" if pd.api.types.is_numeric_dtype(df[col]) else "text")
+        col: type_labels[_friendly_type(str(df[col].dtype))]
         for col in df.columns
     }
     inconsistent = analysis["inconsistent_text"]
@@ -89,7 +113,7 @@ def dataset_analysis():
 
     # Summary counts for the bento-grid stat cards
     total_missing = sum(missing.values())
-    duplicates = analysis_service.get_duplicate_count(df)
+    duplicates = analysis["duplicates"]
     text_issues = sum(
         (f.get("whitespace_cells") or 0) + len(f.get("case_variants") or [])
         for f in inconsistent.values()
@@ -161,6 +185,37 @@ def select_columns():
         flash("Please select at least one column to continue.", "error")
         return redirect(url_for("dataset.show_dataset"))
 
+    selected_before_rename = set(valid_selected)
+    type_targets = {
+        "Number": "float",
+        "Text": "string",
+        "Date": "date",
+        "Yes/No": "boolean",
+    }
+    existing_types = dataset_session.column_type_overrides
+    requested_types = {}
+    for column in all_cols:
+        requested = request.form.get(f"type_{column}", "").strip()
+        current = _friendly_type(str(df[column].dtype))
+        if requested not in type_targets or column not in selected_before_rename:
+            continue
+        if requested != current:
+            requested_types[column] = type_targets[requested]
+        elif column in existing_types:
+            requested_types[column] = existing_types[column]
+
+    for column, target_type in requested_types.items():
+        converted, converted_count = cleaning_service.convert_column_type(
+            df, column, target_type
+        )
+        if converted_count == 0 and df[column].notna().any():
+            flash(
+                f"Could not convert '{column}' to the selected data type.",
+                "error",
+            )
+            return redirect(url_for("dataset.show_dataset"))
+        df = converted
+
     # Apply any column renames submitted from the edit column modal
     renames = {}
     for c in all_cols:
@@ -173,7 +228,7 @@ def select_columns():
         valid_selected = [renames.get(c, c) for c in valid_selected]
         all_cols = [str(c) for c in df.columns]
 
-    if not renames and set(valid_selected) == set(all_cols):
+    if not renames and not requested_types and set(valid_selected) == set(all_cols):
         # Nothing to drop or rename — just proceed as normal
         session.pop("selected_columns", None)
         flash("All columns kept. Proceeding to cleaning.", "success")
@@ -190,11 +245,21 @@ def select_columns():
 
     session["current_path"] = str(output_path)
     session["selected_columns"] = valid_selected
+    renamed_types = {
+        renames.get(column, column): target_type
+        for column, target_type in requested_types.items()
+    }
+    if renamed_types:
+        session["column_type_overrides"] = renamed_types
+    else:
+        session.pop("column_type_overrides", None)
     dropped = [c for c in all_cols if c not in valid_selected]
-    flash(
-        f"Kept {len(valid_selected)} column(s). Dropped: {', '.join(dropped)}.",
-        "success",
-    )
+    summary = f"Kept {len(valid_selected)} column(s)."
+    if dropped:
+        summary += f" Dropped: {', '.join(dropped)}."
+    if renamed_types:
+        summary += f" Updated {len(renamed_types)} data type(s)."
+    flash(summary, "success")
     return redirect(url_for("dataset.dataset_analysis"))
 
 

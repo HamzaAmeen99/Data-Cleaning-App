@@ -67,6 +67,16 @@ check(
 )
 check("custom missing filled with numeric 25", cleaned_num["age"].iloc[1] == 25.0)
 
+df_bool = pd.DataFrame({"active": ["yes", "No", "1", "0", "unknown"]})
+cleaned_bool, bool_count = cleaning_service.convert_column_type(
+    df_bool, "active", "boolean"
+)
+check("boolean conversion recognizes common values", bool_count == 4)
+check(
+    "boolean conversion marks invalid values missing",
+    pd.isna(cleaned_bool["active"].iloc[4]),
+)
+
 # --------------------------------------------------------------------------
 # 4. Test Invalid Date Cleaning
 # --------------------------------------------------------------------------
@@ -152,14 +162,134 @@ with app.test_client() as client:
     check("reset restored original 20 rows", b"20" in res_reset.data)
 
 # --------------------------------------------------------------------------
-# 8. Test Failed Upload File Cleanup
+# 8. Explorer datatype selection persists into Cleaning
 # --------------------------------------------------------------------------
 with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        type_csrf = sess.get("csrf_token", "test-token")
+
+    with open(messy_csv, "rb") as fh:
+        client.post(
+            "/upload",
+            data={"file": (fh, "type_test.csv"), "csrf_token": type_csrf},
+            content_type="multipart/form-data",
+        )
+
+    columns = [
+        "StudentID", "Name", "Age", "Gender", "Email", "Department",
+        "CGPA", "EnrollmentDate",
+    ]
+    type_response = client.post(
+        "/dataset/select-columns",
+        data={
+            "csrf_token": type_csrf,
+            "selected_columns": columns,
+            "type_StudentID": "Text",
+        },
+    )
+    check("datatype selection redirects to Cleaning", type_response.status_code == 302)
+
+    with client.session_transaction() as sess:
+        saved_types = sess.get("column_type_overrides", {})
+    check(
+        "datatype selection is stored",
+        saved_types.get("StudentID") == "string",
+        f"stored overrides: {saved_types}",
+    )
+
+    type_page = client.get("/dataset/analysis").get_data(as_text=True)
+    student_type_area = type_page[type_page.find("StudentID"):type_page.find("StudentID") + 500]
+    check("selected datatype appears in Cleaning", "text" in student_type_area.lower())
+
+    client.get("/dataset/reset")
+    with client.session_transaction() as sess:
+        check("reset clears datatype selections", "column_type_overrides" not in sess)
+
+# --------------------------------------------------------------------------
+# 9. Ending a session deletes its files and state
+# --------------------------------------------------------------------------
+with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        end_csrf = sess.get("csrf_token", "test-token")
+
+    with open(messy_csv, "rb") as fh:
+        client.post(
+            "/upload",
+            data={"file": (fh, "end_session_test.csv"), "csrf_token": end_csrf},
+            content_type="multipart/form-data",
+        )
+
+    client.post(
+        "/clean",
+        data={"op_trim": "1", "csrf_token": end_csrf},
+        follow_redirects=True,
+    )
+    client.get("/download?format=excel")
+
+    workspace_html = client.get("/dataset").data
+    check(
+        "active workspace offers end session",
+        b'id="end-session-btn"' in workspace_html
+        and b'id="end-session-modal"' in workspace_html,
+    )
+
+    with client.session_transaction() as sess:
+        session_paths = {
+            Path(path)
+            for key in ("upload_path", "current_path", "processed_path", "excel_path")
+            if (path := sess.get(key))
+        }
+    check("session files exist before ending", session_paths and all(path.exists() for path in session_paths))
+
+    end_response = client.post(
+        "/session/end",
+        data={"csrf_token": end_csrf},
+        follow_redirects=False,
+    )
+    check(
+        "end session redirects to fresh upload",
+        end_response.status_code == 302 and end_response.headers["Location"].endswith("/upload"),
+    )
+    check("end session deletes all files", all(not path.exists() for path in session_paths))
+    with client.session_transaction() as sess:
+        check("end session clears progress", "original_filename" not in sess)
+
+with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        beacon_csrf = sess.get("csrf_token", "test-token")
+    with open(messy_csv, "rb") as fh:
+        client.post(
+            "/upload",
+            data={"file": (fh, "beacon_end_test.csv"), "csrf_token": beacon_csrf},
+            content_type="multipart/form-data",
+        )
+    with client.session_transaction() as sess:
+        beacon_upload = Path(sess["upload_path"])
+    beacon_response = client.post(
+        "/session/end",
+        data={"csrf_token": beacon_csrf, "beacon": "1"},
+    )
+    check(
+        "tab-close beacon ends session",
+        beacon_response.status_code == 204 and not beacon_upload.exists(),
+    )
+
+# --------------------------------------------------------------------------
+# 10. Test Failed Upload File Cleanup
+# --------------------------------------------------------------------------
+with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        failed_upload_csrf = sess.get("csrf_token", "test-token")
     # Upload corrupted file
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv"), "csrf_token": csrf},
+        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv"), "csrf_token": failed_upload_csrf},
         content_type="multipart/form-data",
+        follow_redirects=True,
     )
     # Verify no unparseable_test.csv lingers in uploads
     broken_exists = (app.config["UPLOAD_FOLDER"] / "unparseable_test.csv").exists()

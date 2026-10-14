@@ -176,7 +176,7 @@ def clean_invalid_dates(
 def convert_column_type(
     df: pd.DataFrame, column: str, target_type: str
 ) -> tuple[pd.DataFrame, int]:
-    """Convert a column to integer, float, string or date.
+    """Convert a column to integer, float, string, date or boolean.
 
     Values that cannot be converted are set to missing instead of crashing.
 
@@ -198,6 +198,21 @@ def convert_column_type(
             result = series.astype("string")
         elif target_type == "date":
             result = pd.to_datetime(series, errors="coerce")
+        elif target_type == "boolean":
+            if pd.api.types.is_bool_dtype(series):
+                result = series.astype("boolean")
+            else:
+                normalized = series.astype("string").str.strip().str.lower()
+                result = normalized.map({
+                    "true": True,
+                    "yes": True,
+                    "y": True,
+                    "1": True,
+                    "false": False,
+                    "no": False,
+                    "n": False,
+                    "0": False,
+                }).astype("boolean")
         else:
             return df, 0
     except (ValueError, TypeError):

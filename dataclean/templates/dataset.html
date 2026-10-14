@@ -24,7 +24,7 @@
     </a>
     {% endif %}
     <button type="button" class="btn btn-primary flex items-center gap-2"
-      onclick="document.getElementById('col-select-form').submit()">
+      onclick="document.getElementById('col-select-form').requestSubmit()">
       <span class="material-symbols-outlined" style="font-size:18px;">auto_fix_high</span>
       Configure Cleaning
     </button>
@@ -87,7 +87,9 @@
     <!-- Hidden title keeping smoke tests and accessibility working -->
     <span class="hidden">Column Selection</span>
 
-    <form action="{{ url_for('dataset.select_columns') }}" method="post" id="col-select-form">
+    <form action="{{ url_for('dataset.select_columns') }}" method="post" id="col-select-form"
+      data-loading-title="Preparing your workspace"
+      data-loading-message="Applying your column names, data types, and import selections.">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
       <table class="col-spec-table">
@@ -106,6 +108,7 @@
             <td>
               <span id="col-name-label-{{ loop.index }}" class="col-name-display">{{ col.name }}</span>
               <input type="hidden" name="rename_{{ col.name }}" id="col-rename-input-{{ loop.index }}" value="{{ col.name }}">
+              <input type="hidden" name="type_{{ col.name }}" id="col-type-input-{{ loop.index }}" value="{{ col.type }}">
             </td>
             <td style="text-align:center;">
               <button type="button" class="type-pill-btn" onclick="openEditModal('{{ loop.index }}', '{{ col.name }}', '{{ col.type }}')" title="Edit column">
@@ -174,7 +177,7 @@
     </div>
     <div class="flex justify-between items-center" style="padding:10px 20px; border-top:1px solid var(--border); background:var(--surface-raised);">
       <span class="text-xs text-secondary">{{ preview_shown }} of {{ total_rows | number_format }} rows</span>
-      <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('col-select-form').submit()">
+      <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('col-select-form').requestSubmit()">
         Apply & Continue
       </button>
     </div>
@@ -221,7 +224,7 @@
         <span class="text-error font-semibold">{{ total_missing | number_format }} cells</span>
       </div>
       {% endif %}
-      <button type="button" class="btn btn-primary w-full" onclick="document.getElementById('col-select-form').submit()">
+      <button type="button" class="btn btn-primary w-full" onclick="document.getElementById('col-select-form').requestSubmit()">
         Configure Cleaning
       </button>
     </div>
@@ -247,9 +250,9 @@
 
       <div>
         <label style="display:block; font-size:12.5px; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">
-          Detected Type
+          Property Type
         </label>
-        <select id="modal-property-type" class="select-styled" style="padding:9px 12px;" disabled>
+        <select id="modal-property-type" class="select-styled" style="padding:9px 12px;">
           <option value="Number">Number</option>
           <option value="Text">Text</option>
           <option value="Date">Date</option>
@@ -259,7 +262,7 @@
 
       <div class="modal-note">
         <span class="material-symbols-outlined">info</span>
-        <span>Detected types are shown here for reference. Convert a column after continuing to Cleaning.</span>
+        <span>Choose how this column should be presented. Dataset conversion remains available in Cleaning.</span>
       </div>
     </div>
     <div class="modal-footer">
@@ -327,11 +330,13 @@
 
     const nameLabel = document.getElementById("col-name-label-" + activeModalIndex);
     const renameInput = document.getElementById("col-rename-input-" + activeModalIndex);
+    const typeInput = document.getElementById("col-type-input-" + activeModalIndex);
     const typeLabel = document.getElementById("col-type-label-" + activeModalIndex);
     const typeIcon = document.getElementById("col-type-icon-" + activeModalIndex);
 
     if (nameLabel) nameLabel.textContent = newName;
     if (renameInput) renameInput.value = newName;
+    if (typeInput) typeInput.value = newType;
     if (typeLabel) typeLabel.textContent = newType;
 
     if (typeIcon) {

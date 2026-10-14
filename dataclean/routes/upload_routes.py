@@ -24,6 +24,18 @@ def upload_page():
     return render_template("upload.html")
 
 
+@upload_bp.route("/session/end", methods=["POST"])
+def end_session():
+    """Delete the active session's files and discard all workflow progress."""
+    check_csrf()
+    is_beacon = request.form.get("beacon") == "1"
+    dataset_session.end()
+    if is_beacon:
+        return "", 204
+    flash("Session ended. Your uploaded and processed files were deleted.", "success")
+    return redirect(url_for("upload.upload_page"))
+
+
 @upload_bp.route("/upload/sample", methods=["GET"])
 def sample_redirect():
     # The sample-dataset feature was removed; old bookmarks land on the upload page
@@ -46,20 +58,6 @@ def upload_dataset():
     filepath = file_service.save_uploaded_file(file)
     if filepath is None:
         flash("We couldn't save that file. Please try again.", "error")
-        return redirect(url_for("upload.upload_page"))
-
-    # Verify the file can actually be parsed before showing any pages.
-    df = file_service.load_dataset(filepath)
-    if df is None:
-        file_service.delete_file(filepath)
-        flash(
-            "We couldn't read this file. Please make sure it is a valid CSV or Excel file.",
-            "error",
-        )
-        return redirect(url_for("upload.upload_page"))
-    if df.empty:
-        file_service.delete_file(filepath)
-        flash("This file contains no data rows. Please upload a dataset with data.", "error")
         return redirect(url_for("upload.upload_page"))
 
     dataset_session.start_new(filepath, filename)

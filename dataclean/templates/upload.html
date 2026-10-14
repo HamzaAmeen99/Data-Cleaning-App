@@ -18,7 +18,9 @@
 
   <!-- Upload Form & Card -->
   <div class="upload-card-wrapper">
-    <form id="upload-form" action="{{ url_for('upload.upload_dataset') }}" method="post" enctype="multipart/form-data">
+    <form id="upload-form" action="{{ url_for('upload.upload_dataset') }}" method="post" enctype="multipart/form-data"
+      data-loading-title="Analyzing your dataset"
+      data-loading-message="Reading the file and checking its rows, columns, and data quality.">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="file" id="file-input" name="file" accept=".csv,.xlsx,.xls" class="hidden" aria-label="Upload CSV or Excel file">
 

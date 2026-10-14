@@ -36,6 +36,7 @@ def clean_dataset():
     if df is None:
         flash("The uploaded dataset is no longer available. Please upload it again.", "error")
         return redirect(url_for("upload.index"))
+    df = dataset_session.apply_column_types(df)
 
     operations = _parse_operations(df)
     if not operations:
@@ -133,6 +134,7 @@ def download_dataset():
         excel_path = file_service.export_dataset(df, stem, file_format="excel")
     except Exception:
         abort(404)
+    session["excel_path"] = str(excel_path)
     return send_file(excel_path, as_attachment=True, download_name=f"{stem}_cleaned.xlsx")
 
 

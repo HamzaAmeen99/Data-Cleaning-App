@@ -13,7 +13,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
     rel="stylesheet" />
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=22" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=24" />
 
   <script>
     (function() {
@@ -24,7 +24,10 @@
   </script>
 </head>
 
-<body class="{% if request.endpoint == 'upload.index' %}public-page{% else %}workspace-page{% endif %}">
+<body class="{% if request.endpoint == 'upload.index' %}public-page{% else %}workspace-page{% endif %}"
+  data-session-active="{{ 'true' if session.get('original_filename') else 'false' }}"
+  data-end-session-url="{{ url_for('upload.end_session') }}"
+  data-csrf-token="{{ csrf_token }}">
   {% set is_landing = request.endpoint == 'upload.index' %}
 
   {% if is_landing %}
@@ -94,6 +97,12 @@
       {% endif %}
 
       <div class="sidebar-footer">
+        {% if session.get('original_filename') %}
+        <button type="button" class="end-session-btn" id="end-session-btn">
+          <span class="material-symbols-outlined">logout</span>
+          <span>End session</span>
+        </button>
+        {% endif %}
         <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle theme">
           <span class="material-symbols-outlined" id="theme-icon">dark_mode</span>
           <span id="theme-label">Dark Mode</span>
@@ -154,7 +163,55 @@
   </div>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=22"></script>
+  {% if not is_landing %}
+  <div class="app-loading-screen hidden" id="app-loading-screen" role="status" aria-live="polite" aria-hidden="true">
+    <div class="loading-brand">
+      <span class="brand-mark"><span class="material-symbols-outlined">data_object</span></span>
+      <span>DataClean</span>
+    </div>
+    <div class="loading-content">
+      <div class="loading-status-chip"><span></span> Processing</div>
+      <div class="loading-orbit" aria-hidden="true">
+        <span class="material-symbols-outlined">table_view</span>
+      </div>
+      <h2 id="app-loading-title">Preparing your dataset</h2>
+      <p id="app-loading-message">This may take a moment for larger files.</p>
+      <div class="loading-progress" aria-hidden="true"><span></span></div>
+      <small>Please keep this tab open while processing completes.</small>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not is_landing and session.get('original_filename') %}
+  <div class="modal-backdrop hidden" id="end-session-modal" role="dialog" aria-modal="true" aria-labelledby="end-session-title">
+    <div class="modal-dialog session-end-dialog">
+      <div class="modal-header">
+        <h3 id="end-session-title">End this session?</h3>
+        <button type="button" class="modal-close-btn" id="end-session-close" aria-label="Close dialog">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="session-end-warning">
+          <span class="material-symbols-outlined">delete_forever</span>
+          <div>
+            <strong>Your progress will be deleted permanently.</strong>
+            <p>The uploaded file, cleaned dataset, export files, and cleaning history will be removed from this session.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-surface" id="end-session-cancel">Keep working</button>
+        <form action="{{ url_for('upload.end_session') }}" method="post" id="end-session-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn-danger">Leave &amp; delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=24"></script>
 </body>
 
 </html>
