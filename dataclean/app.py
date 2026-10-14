@@ -4,13 +4,11 @@ Run from the dataclean/ directory with:
     flask --app app run --debug
 """
 
-import logging
 import secrets
-import warnings
-
-from flask import Flask, flash, redirect, render_template, request, session, url_for
 
 from config import Config
+from flask import Flask, flash, redirect, render_template, session, url_for
+from flask_session import Session
 from routes import cleaning_bp, dataset_bp, upload_bp
 
 
@@ -18,13 +16,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     """Application factory: build, configure and wire up the Flask app."""
     app = Flask(__name__)
     app.config.from_object(config_class)
-
-    if app.config["SECRET_KEY"] == "dev-key-change-me":
-        warnings.warn(
-            "DataClean is using the default SECRET_KEY. "
-            "Set the DATACLEAN_SECRET_KEY environment variable before deploying.",
-            stacklevel=2,
-        )
+    Session(app)
 
     _ensure_folders(app)
 

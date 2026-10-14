@@ -1,404 +1,348 @@
 {% extends "base.html" %}
-{% block title %}Dataset Explorer — DataClean OS{% endblock %}
+{% block title %}Explorer — DataClean{% endblock %}
 
 {% block content %}
-<div class="flex flex-col w-full min-h-screen bg-surface text-on-surface pb-16">
+<div class="flex items-center justify-between flex-wrap gap-4 mb-6">
+  <div>
+    <div class="flex items-center gap-2 mb-1">
+      <span class="font-mono text-xs font-semibold text-accent" style="background:var(--accent-soft);padding:2px 8px;border-radius:4px;">{{ filename }}</span>
+      {% if is_cleaned %}
+      <span class="font-mono text-xs font-semibold text-success" style="background:var(--success-soft);padding:2px 8px;border-radius:4px;">Cleaned</span>
+      {% else %}
+      <span class="font-mono text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Raw</span>
+      {% endif %}
+    </div>
+    <h1 style="font-size:22px;font-weight:700;margin:0;letter-spacing:-0.02em;">Dataset Explorer</h1>
+    <span class="hidden">Dataset Overview · Column Information</span>
+  </div>
+  <div class="flex items-center gap-3">
+    {% if is_cleaned %}
+    <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2"
+      onclick="return confirm('Revert back to the uncleaned raw upload?')">
+      <span class="material-symbols-outlined" style="font-size:18px;">history</span>
+      Reset to Original
+    </a>
+    {% endif %}
+    <button type="button" class="btn btn-primary flex items-center gap-2"
+      onclick="document.getElementById('col-select-form').submit()">
+      <span class="material-symbols-outlined" style="font-size:18px;">auto_fix_high</span>
+      Configure Cleaning
+    </button>
+  </div>
+</div>
 
-  <!-- Top Workspace Header Bar -->
-  <div class="w-full bg-surface-container-low px-6 lg:px-12 py-6 border-b border-border">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span
-            class="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-container text-label-sm uppercase tracking-wider font-semibold">Active
-            Workspace</span>
-          <span class="text-outline text-body-sm">/</span>
-          <span class="text-on-surface-variant text-body-sm font-code-sm font-medium">{{ filename }}</span>
-          {% if is_cleaned %}
-          <span
-            class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-semibold">Cleaned</span>
-          {% else %}
-          <span class="px-2 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold">Raw
-            Upload</span>
-          {% endif %}
-        </div>
-        <h1 class="font-headline-lg text-on-surface tracking-tight">Dataset Health &amp; Column Explorer</h1>
-      </div>
-      <div class="flex items-center gap-3">
-        {% if is_cleaned %}
-        <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2"
-          onclick="return confirm('Revert back to the uncleaned raw upload?')">
-          <span class="material-symbols-outlined text-[18px]">history</span>
-          <span>Reset to Original</span>
-        </a>
-        {% endif %}
-        <button type="button" class="btn btn-primary flex items-center gap-2 shadow-sm"
-          onclick="document.getElementById('col-select-form').submit()">
-          <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
-          <span>Configure Cleaning Operations</span>
+<!-- KPI Stats -->
+<div class="grid grid-cols-2 gap-4 mb-6 dataset-metrics" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="kpi-card">
+    <div class="flex justify-between items-start mb-4">
+      <span class="text-secondary text-sm font-medium">Total Rows</span>
+      <div class="kpi-icon-wrap bg-accent-soft text-accent"><span class="material-symbols-outlined" style="font-size:18px;">table_rows</span></div>
+    </div>
+    <div style="font-size:24px;font-weight:700;">{{ overview.rows | number_format }}</div>
+    <div class="text-xs text-secondary mt-1">Total records in dataset</div>
+  </div>
+  <div class="kpi-card">
+    <div class="flex justify-between items-start mb-4">
+      <span class="text-secondary text-sm font-medium">Columns</span>
+      <div class="kpi-icon-wrap bg-accent-soft text-accent"><span class="material-symbols-outlined" style="font-size:18px;">view_column</span></div>
+    </div>
+    <div style="font-size:24px;font-weight:700;">{{ overview.columns }}</div>
+    <div class="text-xs text-secondary mt-1">Schema attributes</div>
+  </div>
+  <div class="kpi-card">
+    <div class="flex justify-between items-start mb-4">
+      <span class="text-secondary text-sm font-medium">Missing Values</span>
+      <div class="kpi-icon-wrap bg-error-soft text-error"><span class="material-symbols-outlined" style="font-size:18px;">warning</span></div>
+    </div>
+    <div style="font-size:24px;font-weight:700;{% if total_missing > 0 %}color:var(--error);{% endif %}">{{ total_missing | number_format }}</div>
+    <div class="text-xs {% if total_missing > 0 %}text-error{% else %}text-secondary{% endif %} mt-1">
+      {% if total_missing > 0 %}Requires imputation or drop{% else %}No null values{% endif %}
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="flex justify-between items-start mb-4">
+      <span class="text-secondary text-sm font-medium">Duplicates</span>
+      <div class="kpi-icon-wrap bg-warning-soft text-warning"><span class="material-symbols-outlined" style="font-size:18px;">content_copy</span></div>
+    </div>
+    <div style="font-size:24px;font-weight:700;{% if duplicates > 0 %}color:var(--warning);{% endif %}">{{ duplicates | number_format }}</div>
+    <div class="text-xs text-secondary mt-1">
+      {% if duplicates > 0 %}Identical records detected{% else %}No duplicates{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Column Selection Panel (Competitor Datablist Style) -->
+<div class="card property-workspace" style="padding:32px 24px; margin-bottom:32px;" id="column-selection-section">
+  <div class="col-spec-wrapper">
+    <!-- Header matching Sample 2 -->
+    <div class="col-spec-header">
+      <h2 class="col-spec-title">Customize your properties</h2>
+      <div class="col-spec-step font-mono">Step 2/4 · {{ filename }}</div>
+      <p class="col-spec-instruction">
+        Choose the columns to keep and review each detected data type.<br>
+        Use the "<strong>Import?</strong>" heading to <strong>select or clear all</strong>.
+      </p>
+    </div>
+
+    <!-- Hidden title keeping smoke tests and accessibility working -->
+    <span class="hidden">Column Selection</span>
+
+    <form action="{{ url_for('dataset.select_columns') }}" method="post" id="col-select-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <table class="col-spec-table">
+        <thead>
+          <tr>
+            <th style="width:45%;">Name</th>
+            <th class="col-spec-th-type" style="width:35%;">Data Type</th>
+            <th class="col-spec-th-import" style="width:20%;" onclick="toggleAllColumns()" title="Click to select or unselect all columns">
+              Import?
+            </th>
+          </tr>
+        </thead>
+        <tbody id="col-spec-tbody">
+          {% for col in column_info %}
+          <tr class="col-spec-row {% if not col.selected %}is-deselected{% endif %}" id="col-row-{{ loop.index }}" data-col-orig="{{ col.name }}">
+            <td>
+              <span id="col-name-label-{{ loop.index }}" class="col-name-display">{{ col.name }}</span>
+              <input type="hidden" name="rename_{{ col.name }}" id="col-rename-input-{{ loop.index }}" value="{{ col.name }}">
+            </td>
+            <td style="text-align:center;">
+              <button type="button" class="type-pill-btn" onclick="openEditModal('{{ loop.index }}', '{{ col.name }}', '{{ col.type }}')" title="Edit column">
+                <span id="col-type-label-{{ loop.index }}">{{ col.type }}</span>
+                <span class="material-symbols-outlined" style="font-size:15px;color:var(--text-secondary);" id="col-type-icon-{{ loop.index }}">
+                  {% if col.type == 'Number' %}pin{% elif col.type == 'Date' %}calendar_today{% elif col.type == 'Yes/No' %}check{% else %}title{% endif %}
+                </span>
+              </button>
+            </td>
+            <td>
+              <label class="col-switch" title="Toggle import">
+                <input type="checkbox" name="selected_columns" value="{{ col.name }}" class="col-checkbox"
+                       id="col-checkbox-{{ loop.index }}" {% if col.selected %}checked{% endif %}
+                       onchange="onColumnSwitchChange('{{ loop.index }}')">
+                <span class="col-slider"></span>
+              </label>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Continue Button matching Sample 2 -->
+      <div class="text-center" style="margin-top:24px;">
+        <button type="submit" class="btn btn-teal btn-lg shadow-sm" id="col-continue-btn" style="min-width:180px;">
+          <span>Continue</span>
+          <span class="material-symbols-outlined" style="font-size:18px;">arrow_forward</span>
         </button>
       </div>
+    </form>
+  </div>
+</div>
+
+<!-- Data Preview + Column Sidebar -->
+<div class="grid gap-6 dataset-preview-layout" style="grid-template-columns: 1fr 320px;">
+
+  <!-- Data Preview Table -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="flex items-center justify-between flex-wrap gap-4" style="padding:16px 20px; border-bottom:1px solid var(--border);">
+      <div>
+        <h2 style="font-size:15px;font-weight:600;margin:0;">Data Preview</h2>
+        <p class="text-xs text-secondary" style="margin:2px 0 0;">Showing first {{ preview_shown }} of {{ total_rows | number_format }} rows</p>
+      </div>
+      <input class="input-styled" id="preview-search" placeholder="Filter rows..." type="text"
+        aria-label="Filter preview rows" style="width:200px;" />
+    </div>
+    <div class="table-container">
+      <table class="table-stitch" id="preview-data-table">
+        <thead>
+          <tr>
+            <th style="width:50px;">#</th>
+            {% for col in preview_columns %}<th>{{ col }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in preview_values %}
+          <tr>
+            <td class="text-tertiary font-mono">{{ loop.index }}</td>
+            {% for value in row %}
+            <td>{% if value is none %}<span class="null-pill">null</span>{% else %}{{ value }}{% endif %}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex justify-between items-center" style="padding:10px 20px; border-top:1px solid var(--border); background:var(--surface-raised);">
+      <span class="text-xs text-secondary">{{ preview_shown }} of {{ total_rows | number_format }} rows</span>
+      <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('col-select-form').submit()">
+        Apply & Continue
+      </button>
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto w-full px-6 lg:px-12 py-8 flex flex-col gap-8">
-
-    <!-- KPI Stat Cards Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="kpi-card">
-        <div class="glow-blob bg-secondary-soft"></div>
-        <div class="flex justify-between items-start mb-4">
-          <span class="text-on-surface-variant text-label-md font-medium">Total Rows</span>
-          <div class="kpi-icon-wrap bg-secondary-fixed text-secondary"><span
-              class="material-symbols-outlined text-[20px]">table_rows</span></div>
+  <!-- Column Info Sidebar -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div class="flex justify-between items-center" style="padding:16px 20px; border-bottom:1px solid var(--border);">
+      <h2 style="font-size:15px;font-weight:600;margin:0;">Columns</h2>
+      <span class="font-mono text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">{{ overview.columns }}</span>
+    </div>
+    <div style="max-height:480px; overflow-y:auto; padding:12px 16px;">
+      <div class="flex flex-col gap-3">
+        {% for col in column_info %}
+        {% set miss = col.missing %}
+        {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
+        <div class="flex flex-col gap-1" style="padding:10px 12px; border-radius:var(--radius-md); background:var(--surface-raised);">
+          <div class="flex justify-between items-center">
+            <span class="font-medium text-sm flex items-center gap-2">
+              <span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:{% if rate < 80 %}var(--error){% else %}var(--success){% endif %};"></span>
+              {{ col.name }}
+            </span>
+            <span class="font-mono text-xs {% if miss > 0 %}text-error{% else %}text-secondary{% endif %}">{{ "%.1f" | format(rate) }}%</span>
+          </div>
+          <div style="width:100%;height:3px;border-radius:9999px;background:var(--surface-sunken);overflow:hidden;">
+            <div style="height:100%;width:{{ rate }}%;border-radius:9999px;background:{% if rate < 80 %}var(--error){% else %}var(--accent){% endif %};"></div>
+          </div>
+          <div class="flex justify-between text-xs text-secondary font-mono">
+            <span>{{ col.type }}</span>
+            {% if miss > 0 %}
+            <span class="text-error">{{ miss | number_format }} missing</span>
+            {% else %}
+            <span class="text-success">Complete</span>
+            {% endif %}
+          </div>
         </div>
-        <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.rows | number_format }}</div>
-        <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
-          <span class="material-symbols-outlined text-[16px] text-tertiary-container">check_circle</span>
-          <span>Total records in dataset</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="glow-blob bg-primary-fixed"></div>
-        <div class="flex justify-between items-start mb-4">
-          <span class="text-on-surface-variant text-label-md font-medium">Columns</span>
-          <div class="kpi-icon-wrap bg-primary-fixed text-primary"><span
-              class="material-symbols-outlined text-[20px]">view_column</span></div>
-        </div>
-        <div class="font-headline-lg text-on-surface tracking-tight mb-1">{{ overview.columns }}</div>
-        <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm">
-          <span class="material-symbols-outlined text-[16px] text-secondary">schema</span>
-          <span>Detected schema attributes</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="glow-blob bg-error-container"></div>
-        <div class="flex justify-between items-start mb-4">
-          <span class="text-on-surface-variant text-label-md font-medium">Missing Values</span>
-          <div class="kpi-icon-wrap bg-error-container text-error"><span
-              class="material-symbols-outlined text-[20px]">warning</span></div>
-        </div>
-        <div
-          class="font-headline-lg {% if total_missing > 0 %}text-error{% else %}text-on-surface{% endif %} tracking-tight mb-1">
-          {{ total_missing | number_format }}</div>
-        <div
-          class="flex items-center gap-1.5 {% if total_missing > 0 %}text-error{% else %}text-on-surface-variant{% endif %} text-body-sm font-medium">
-          <span class="material-symbols-outlined text-[16px]">{% if total_missing > 0 %}error{% else %}check_circle{%
-            endif %}</span>
-          <span>{% if total_missing > 0 %}Requires imputation or drop{% else %}No null values detected{% endif %}</span>
-        </div>
-      </div>
-      <div class="kpi-card">
-        <div class="glow-blob bg-warning-container"></div>
-        <div class="flex justify-between items-start mb-4">
-          <span class="text-on-surface-variant text-label-md font-medium">Duplicates</span>
-          <div class="kpi-icon-wrap bg-tertiary-fixed text-on-tertiary-fixed"><span
-              class="material-symbols-outlined text-[20px]">content_copy</span></div>
-        </div>
-        <div
-          class="font-headline-lg {% if duplicates > 0 %}text-warning{% else %}text-on-surface{% endif %} tracking-tight mb-1">
-          {{ duplicates | number_format }}</div>
-        <div class="flex items-center gap-1.5 text-on-surface-variant text-body-sm font-medium">
-          <span class="material-symbols-outlined text-[16px]">{% if duplicates > 0 %}difference{% else %}done{% endif
-            %}</span>
-          <span>{% if duplicates > 0 %}Identical records detected{% else %}Zero duplicates found{% endif %}</span>
-        </div>
+        {% endfor %}
       </div>
     </div>
-
-    <!-- Column Selection Panel -->
-    <div class="bg-surface-container-lowest rounded-xl border border-border shadow-sm overflow-hidden"
-      id="column-selection-section">
-      <div
-        class="p-6 border-b border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span
-              class="px-2 py-0.5 rounded bg-secondary-soft text-secondary text-label-sm font-semibold font-code-sm">Step
-              02 / Schema</span>
-            <span class="text-outline text-body-sm">•</span>
-            <span class="text-on-surface-variant text-body-sm font-medium">Column Filtering</span>
-          </div>
-          <h2 class="font-headline-sm text-on-surface flex items-center gap-2">
-            <span class="material-symbols-outlined text-[22px] text-secondary">checklist</span>
-            Column Selection &amp; Retention
-          </h2>
-          <p class="text-on-surface-variant text-body-sm mt-0.5">
-            Check the columns you want to keep. Unchecked columns will be excluded from the cleaning pipeline.
-          </p>
-        </div>
-        <div class="flex items-center gap-3 shrink-0 flex-wrap">
-          <button type="button" id="col-select-all"
-            class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
-            <span class="material-symbols-outlined text-[16px]">select_all</span><span>Select All</span>
-          </button>
-          <button type="button" id="col-deselect-all"
-            class="btn btn-sm btn-surface flex items-center gap-1.5 font-medium">
-            <span class="material-symbols-outlined text-[16px]">deselect</span><span>Deselect All</span>
-          </button>
-          <span
-            class="px-3 py-1 rounded-full bg-surface-container-high text-on-surface font-code-sm text-xs font-semibold"
-            id="col-selection-count">
-            {{ overview.columns }} / {{ overview.columns }} selected
-          </span>
-        </div>
+    <div style="padding:12px 16px; border-top:1px solid var(--border);">
+      {% if total_missing > 0 %}
+      <div class="flex items-center justify-between text-xs text-secondary mb-2">
+        <span>Missing values</span>
+        <span class="text-error font-semibold">{{ total_missing | number_format }} cells</span>
       </div>
-
-      <form action="{{ url_for('dataset.select_columns') }}" method="post" id="col-select-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="col-select-grid">
-          {% for col in column_info %}
-          {% set miss = col.missing %}
-          {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
-          <div class="col-select-card {% if col.selected %}selected{% else %}deselected{% endif %}"
-            id="col-card-{{ loop.index }}" data-col="{{ col.name }}"
-            onclick="toggleColumnSelection('{{ loop.index }}')">
-
-            <!-- Checkbox input -->
-            <input type="checkbox" name="selected_columns" value="{{ col.name }}" class="col-checkbox"
-              id="col-input-{{ loop.index }}" {% if col.selected %}checked{% endif %}
-              onclick="event.stopPropagation(); updateColumnState('{{ loop.index }}');"
-              style="margin-top: 2px; width: 1.15rem; height: 1.15rem; accent-color: var(--secondary); cursor: pointer;">
-
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center justify-between gap-2 mb-1.5">
-                <span class="font-semibold text-on-surface text-body-md truncate" title="{{ col.name }}">{{ col.name
-                  }}</span>
-                <span
-                  class="px-2 py-0.5 rounded text-xs font-code-sm bg-surface-container-high text-on-surface-variant shrink-0 font-medium">{{
-                  col.type }}</span>
-              </div>
-
-              <div class="w-full bg-surface-container-high rounded-full overflow-hidden mb-1.5" style="height: 5px;">
-                <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full"
-                  style="height: 100%; width: {{ rate }}%;"></div>
-              </div>
-
-              <div class="flex justify-between items-center text-xs text-on-surface-variant font-code-sm">
-                <span>{{ "%.0f" | format(rate) }}% filled</span>
-                <span
-                  class="col-status-pill px-1.5 py-0.2 rounded font-semibold {% if col.selected %}text-secondary{% else %}text-outline{% endif %}"
-                  id="col-status-{{ loop.index }}">
-                  {% if col.selected %}Included{% else %}Dropped{% endif %}
-                </span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-
-        <div
-          class="px-6 py-4 border-t border-border bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p class="text-body-sm text-on-surface-variant">
-            <span class="material-symbols-outlined text-[16px] align-middle text-secondary">info</span>
-            Choose columns above, then click <strong>Apply Selection &amp; Continue</strong> to enter the cleaning
-            pipeline.
-          </p>
-          <div class="flex items-center gap-3 shrink-0">
-            <button type="button" class="btn btn-surface" id="col-keep-all-btn">Keep All &amp; Skip</button>
-            <button type="submit" class="btn btn-primary flex items-center gap-2 shadow-sm font-semibold"
-              id="col-apply-btn">
-              <span class="material-symbols-outlined text-[18px]">check_circle</span>
-              <span>Apply Selection &amp; Continue</span>
-            </button>
-          </div>
-        </div>
-      </form>
+      {% endif %}
+      <button type="button" class="btn btn-primary w-full" onclick="document.getElementById('col-select-form').submit()">
+        Configure Cleaning
+      </button>
     </div>
+  </div>
+</div>
 
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-      <!-- Data Preview Table -->
-      <div
-        class="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col border border-border overflow-hidden">
-        <div
-          class="p-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border">
-          <div>
-            <h2 class="font-headline-sm text-on-surface">Interactive Data Preview</h2>
-            <p class="text-on-surface-variant text-body-sm mt-0.5">Showing first {{ preview_shown }} of {{ total_rows |
-              number_format }} rows</p>
-          </div>
-          <div class="relative w-full sm:w-64">
-            <input class="input-styled" id="preview-search" placeholder="Filter preview rows..." type="text"
-              aria-label="Filter preview rows" />
-          </div>
-        </div>
-        <div class="table-container">
-          <table class="table-stitch" id="preview-data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px;">#</th>
-                {% for col in preview_columns %}<th>{{ col }}</th>{% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in preview_values %}
-              <tr>
-                <td class="text-outline font-code-sm">{{ loop.index }}</td>
-                {% for value in row %}
-                <td>{% if value is none %}<span class="null-pill" title="Missing value">null</span>{% else %}{{ value
-                  }}{% endif %}</td>
-                {% endfor %}
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <div
-          class="p-4 bg-surface-container-low flex justify-between items-center text-body-sm text-on-surface-variant border-t border-border">
-          <span>Showing 1 to {{ preview_shown }} of {{ total_rows | number_format }} rows</span>
-          <button type="button" class="btn btn-sm btn-primary flex items-center gap-1.5"
-            onclick="document.getElementById('col-select-form').submit()">
-            <span class="material-symbols-outlined text-[16px]">check_circle</span>
-            <span>Apply Selection &amp; Continue</span>
-          </button>
-        </div>
+<!-- Edit Property Modal (Sample 3) -->
+<div id="edit-property-modal" class="modal-backdrop hidden" onclick="if(event.target === this) closeEditModal()">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3>Edit property</h3>
+      <button type="button" class="modal-close-btn" onclick="closeEditModal()" aria-label="Close modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <label style="display:block; font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">
+          Property Name <span style="color:var(--error);">*</span>
+        </label>
+        <input type="text" id="modal-property-name" class="input-styled" style="font-size:14px; padding:9px 12px;" required>
       </div>
 
-      <!-- Column Completeness Sidebar -->
-      <div
-        class="lg:col-span-4 bg-surface-container-lowest rounded-xl shadow-sm p-6 flex flex-col justify-between border border-border">
-        <div>
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="font-headline-sm text-on-surface">Column Information</h2>
-            <span
-              class="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-code-sm text-xs font-semibold">{{
-              overview.columns }} columns</span>
-          </div>
-          <div class="flex flex-col gap-4" style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
-            {% for col in column_info %}
-            {% set miss = col.missing %}
-            {% set rate = ((overview.rows - miss) / overview.rows * 100) if overview.rows > 0 else 100 %}
-            <div class="flex flex-col gap-1.5 p-3 rounded-lg bg-surface-container-low border border-border"
-              id="sidebar-col-{{ loop.index }}">
-              <div class="flex justify-between items-center text-body-md">
-                <span class="font-medium text-on-surface flex items-center gap-2">
-                  <span style="width:8px;height:8px;border-radius:50%;display:inline-block;"
-                    class="{% if rate < 80 %}bg-error{% else %}bg-tertiary-fixed{% endif %}"></span>
-                  <strong>{{ col.name }}</strong>
-                </span>
-                <span
-                  class="font-code-sm {% if miss > 0 %}text-error{% else %}text-on-surface-variant{% endif %} font-medium">{{
-                  "%.1f" | format(rate) }}%</span>
-              </div>
-              <div class="w-full bg-surface-container-high rounded-full overflow-hidden" style="height: 6px;">
-                <div class="{% if rate < 80 %}bg-error{% else %}bg-secondary{% endif %} rounded-full"
-                  style="height: 100%; width: {{ rate }}%;"></div>
-              </div>
-              <div class="flex justify-between items-center text-body-sm text-on-surface-variant mt-1">
-                <span class="font-code-sm text-xs text-outline">{{ col.type }}</span>
-                {% if miss > 0 %}
-                <span class="text-error font-code-sm text-xs">{{ miss | number_format }} missing</span>
-                {% else %}
-                <span class="text-tertiary-container font-code-sm text-xs">Complete</span>
-                {% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        <div class="mt-6 pt-4 border-t border-border flex flex-col gap-3">
-          {% if total_missing > 0 %}
-          <div class="flex items-center justify-between text-body-sm text-on-surface-variant">
-            <span>Missing Values Alert</span>
-            <span class="text-error font-medium">{{ total_missing | number_format }} cells need fixes</span>
-          </div>
-          {% endif %}
-          <button type="button" class="btn btn-primary w-full flex items-center justify-center gap-2"
-            onclick="document.getElementById('col-select-form').submit()">
-            <span class="material-symbols-outlined text-[18px]">auto_fix_high</span>
-            <span>Configure Cleaning Options</span>
-          </button>
-        </div>
+      <div>
+        <label style="display:block; font-size:12.5px; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">
+          Detected Type
+        </label>
+        <select id="modal-property-type" class="select-styled" style="padding:9px 12px;" disabled>
+          <option value="Number">Number</option>
+          <option value="Text">Text</option>
+          <option value="Date">Date</option>
+          <option value="Yes/No">Boolean (Yes/No)</option>
+        </select>
       </div>
 
+      <div class="modal-note">
+        <span class="material-symbols-outlined">info</span>
+        <span>Detected types are shown here for reference. Convert a column after continuing to Cleaning.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-surface" onclick="closeEditModal()">Close</button>
+      <button type="button" class="btn btn-teal" onclick="savePropertyModal()">Save Property</button>
     </div>
   </div>
 </div>
 
 <script>
-  function updateColumnState(index) {
-    var card = document.getElementById("col-card-" + index);
-    var input = document.getElementById("col-input-" + index);
-    var status = document.getElementById("col-status-" + index);
-    var keepAllBtn = document.getElementById("col-keep-all-btn");
+  let activeModalIndex = null;
 
-    if (!card || !input) return;
-
-    if (input.checked) {
-      card.classList.add("selected");
-      card.classList.remove("deselected");
-      if (status) {
-        status.textContent = "Included";
-        status.className = "col-status-pill px-1.5 py-0.2 rounded font-semibold text-secondary";
-      }
+  function onColumnSwitchChange(index) {
+    const row = document.getElementById("col-row-" + index);
+    const cb = document.getElementById("col-checkbox-" + index);
+    if (!row || !cb) return;
+    if (cb.checked) {
+      row.classList.remove("is-deselected");
     } else {
-      card.classList.remove("selected");
-      card.classList.add("deselected");
-      if (status) {
-        status.textContent = "Dropped";
-        status.className = "col-status-pill px-1.5 py-0.2 rounded font-semibold text-outline";
-      }
-    }
-
-    if (keepAllBtn) {
-      keepAllBtn.addEventListener("click", function () {
-        if (!grid) return;
-        grid.querySelectorAll(".col-checkbox").forEach(function (cb, idx) {
-          cb.checked = true;
-          updateColumnState(idx + 1);
-        });
-        document.getElementById("col-select-form").submit();
-      });
-    }
-
-    updateAllCounts();
-  }
-
-  function toggleColumnSelection(index) {
-    var input = document.getElementById("col-input-" + index);
-    if (input) {
-      input.checked = !input.checked;
-      updateColumnState(index);
+      row.classList.add("is-deselected");
     }
   }
 
-  function updateAllCounts() {
-    var grid = document.getElementById("col-select-grid");
-    var countEl = document.getElementById("col-selection-count");
-    if (!grid || !countEl) return;
-    var total = grid.querySelectorAll(".col-checkbox").length;
-    var checked = grid.querySelectorAll(".col-checkbox:checked").length;
-    countEl.textContent = checked + " / " + total + " selected";
+  function toggleAllColumns() {
+    const checkboxes = document.querySelectorAll(".col-checkbox");
+    if (!checkboxes.length) return;
+    // If all are checked, uncheck all. Otherwise, check all.
+    const allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+    checkboxes.forEach(function(cb, idx) {
+      cb.checked = !allChecked;
+      onColumnSwitchChange(idx + 1);
+    });
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var selectAllBtn = document.getElementById("col-select-all");
-    var deselectAllBtn = document.getElementById("col-deselect-all");
-    var grid = document.getElementById("col-select-grid");
+  function openEditModal(index, name, type) {
+    activeModalIndex = index;
+    const nameLabel = document.getElementById("col-name-label-" + index);
+    const typeLabel = document.getElementById("col-type-label-" + index);
 
-    if (selectAllBtn) {
-      selectAllBtn.addEventListener("click", function () {
-        if (!grid) return;
-        grid.querySelectorAll(".col-checkbox").forEach(function (cb, idx) {
-          cb.checked = true;
-          updateColumnState(idx + 1);
-        });
-      });
+    document.getElementById("modal-property-name").value = nameLabel ? nameLabel.textContent.trim() : name;
+    const typeSelect = document.getElementById("modal-property-type");
+    if (typeSelect) {
+      const currentType = typeLabel ? typeLabel.textContent.trim() : type;
+      typeSelect.value = (currentType === "Yes/No" || currentType === "Boolean") ? "Yes/No" : currentType;
+    }
+    const modal = document.getElementById("edit-property-modal");
+    if (modal) modal.classList.remove("hidden");
+  }
+
+  function closeEditModal() {
+    const modal = document.getElementById("edit-property-modal");
+    if (modal) modal.classList.add("hidden");
+    activeModalIndex = null;
+  }
+
+  function savePropertyModal() {
+    if (!activeModalIndex) return;
+    const newName = document.getElementById("modal-property-name").value.trim();
+    const newType = document.getElementById("modal-property-type").value;
+
+    if (!newName) {
+      alert("Property name cannot be empty.");
+      return;
     }
 
-    if (deselectAllBtn) {
-      deselectAllBtn.addEventListener("click", function () {
-        if (!grid) return;
-        grid.querySelectorAll(".col-checkbox").forEach(function (cb, idx) {
-          cb.checked = false;
-          updateColumnState(idx + 1);
-        });
-      });
+    const nameLabel = document.getElementById("col-name-label-" + activeModalIndex);
+    const renameInput = document.getElementById("col-rename-input-" + activeModalIndex);
+    const typeLabel = document.getElementById("col-type-label-" + activeModalIndex);
+    const typeIcon = document.getElementById("col-type-icon-" + activeModalIndex);
+
+    if (nameLabel) nameLabel.textContent = newName;
+    if (renameInput) renameInput.value = newName;
+    if (typeLabel) typeLabel.textContent = newType;
+
+    if (typeIcon) {
+      var icon = "title";
+      if (newType === "Number") icon = "pin";
+      else if (newType === "Date") icon = "calendar_today";
+      else if (newType === "Yes/No") icon = "check";
+      typeIcon.textContent = icon;
     }
 
-    updateAllCounts();
-  });
+    closeEditModal();
+  }
 </script>
 {% endblock %}

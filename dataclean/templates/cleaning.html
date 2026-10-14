@@ -1,495 +1,426 @@
 {% extends "base.html" %}
-{% block title %}Cleaning Operations — DataClean OS{% endblock %}
+{% block title %}Cleaning — DataClean{% endblock %}
 
 {% block content %}
-<div class="flex flex-col w-full pb-28 bg-surface text-on-surface">
+<div style="padding-bottom:80px;">
 
-  <!-- ═══════════════════ PAGE HEADER ═══════════════════ -->
-  <div class="w-full bg-surface-container-low px-6 lg:px-12 py-8 border-b border-border">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-space-md">
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="px-2.5 py-0.5 rounded-full bg-secondary-soft text-secondary text-label-sm font-semibold uppercase tracking-wider font-code-sm">
-            {% if is_cleaned %}
-              Pipeline — Cleaned Dataset
-            {% else %}
-              Pipeline — Original Upload
-            {% endif %}
-          </span>
-          <span class="text-outline text-body-sm">•</span>
-          <span class="text-on-surface-variant text-body-sm font-medium font-code-sm">{{ filename }}</span>
-        </div>
-        <h1 class="font-headline-lg text-on-surface tracking-tight">Cleaning Operations &amp; Issue Resolution</h1>
+  <!-- Page Header -->
+  <div class="flex items-center justify-between flex-wrap gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="font-mono text-xs font-semibold text-accent" style="background:var(--accent-soft);padding:2px 8px;border-radius:4px;">{{ filename }}</span>
+        {% if is_cleaned %}
+        <span class="font-mono text-xs font-semibold text-success" style="background:var(--success-soft);padding:2px 8px;border-radius:4px;">Cleaned</span>
+        {% endif %}
       </div>
-
-      <!-- Dataset Health Score (Stitch top-right widget) -->
-      <div class="flex items-center gap-4">
-        <div class="flex flex-col items-end">
-          <span class="text-label-sm text-on-surface-variant font-medium">Dataset Health Score</span>
-          <span class="font-headline-md {% if health_score >= 90 %}text-tertiary-container{% elif health_score >= 70 %}text-warning{% else %}text-error{% endif %}" style="font-size:28px; line-height:1.1;">
-            {{ health_score }}%
-          </span>
-        </div>
-        <div class="w-12 h-12 rounded-full flex items-center justify-center shadow-sm
-          {% if health_score >= 90 %}bg-tertiary-fixed text-on-tertiary-fixed
-          {% elif health_score >= 70 %}bg-warning-container text-warning
-          {% else %}bg-error-container text-on-error-container{% endif %}">
-          <span class="material-symbols-outlined text-[24px]">
-            {% if health_score >= 90 %}verified{% elif health_score >= 70 %}warning{% else %}warning{% endif %}
-          </span>
-        </div>
-      </div>
+      <h1 style="font-size:22px;font-weight:700;margin:0;letter-spacing:-0.02em;">Cleaning Operations</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-secondary">Health Score</span>
+      <span style="font-size:22px;font-weight:700;{% if health_score >= 90 %}color:var(--success);{% elif health_score >= 70 %}color:var(--warning);{% else %}color:var(--error);{% endif %}">
+        {{ health_score }}%
+      </span>
     </div>
   </div>
 
   <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="max-w-7xl mx-auto px-6 lg:px-12 w-full pt-8 flex flex-col gap-8">
 
-      <!-- ═══════════════════ QUICK STATS BENTO GRID ═══════════════════ -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-
-        <!-- Missing Values -->
-        <div class="bg-surface-container-low p-space-lg rounded-xl border border-border flex flex-col justify-between">
-          <div class="flex justify-between items-start mb-4">
-            <span class="text-on-surface-variant text-label-md font-medium">Missing Values</span>
-            <span class="material-symbols-outlined text-error">error</span>
-          </div>
-          <div>
-            <div class="font-headline-lg text-on-surface" style="font-size:28px; line-height:1.1;">{{ total_missing | number_format }}</div>
-            <span class="text-body-sm {% if total_missing > 0 %}text-error font-medium{% else %}text-tertiary-container{% endif %} mt-1 block">
-              {% if total_missing > 0 %}Requires imputation or drop{% else %}No missing values{% endif %}
-            </span>
-          </div>
+    <!-- Quick Stats -->
+    <div class="grid gap-4 mb-6" style="grid-template-columns:repeat(4,1fr);">
+      <div class="card">
+        <div class="flex justify-between items-start mb-2">
+          <span class="text-sm text-secondary font-medium">Missing Values</span>
+          <span class="material-symbols-outlined text-error" style="font-size:18px;">error</span>
         </div>
-
-        <!-- Duplicate Records -->
-        <div class="bg-surface-container-low p-space-lg rounded-xl border border-border flex flex-col justify-between">
-          <div class="flex justify-between items-start mb-4">
-            <span class="text-on-surface-variant text-label-md font-medium">Duplicate Records</span>
-            <span class="material-symbols-outlined text-secondary">content_copy</span>
-          </div>
-          <div>
-            <div class="font-headline-lg text-on-surface" style="font-size:28px; line-height:1.1;">{{ duplicates | number_format }}</div>
-            <span class="text-body-sm {% if duplicates > 0 %}text-secondary font-medium{% else %}text-tertiary-container{% endif %} mt-1 block">
-              {% if duplicates > 0 %}Exact &amp; fuzzy matches{% else %}No duplicates detected{% endif %}
-            </span>
-          </div>
-        </div>
-
-        <!-- Text Casing Issues -->
-        <div class="bg-surface-container-low p-space-lg rounded-xl border border-border flex flex-col justify-between">
-          <div class="flex justify-between items-start mb-4">
-            <span class="text-on-surface-variant text-label-md font-medium">Text Casing Issues</span>
-            <span class="material-symbols-outlined text-on-surface-variant">text_format</span>
-          </div>
-          <div>
-            <div class="font-headline-lg text-on-surface" style="font-size:28px; line-height:1.1;">{{ text_issues | number_format }}</div>
-            <span class="text-body-sm text-on-surface-variant mt-1 block">Mixed lowercase/uppercase</span>
-          </div>
-        </div>
-
-        <!-- Structural Anomalies -->
-        <div class="bg-surface-container-low p-space-lg rounded-xl border border-border flex flex-col justify-between">
-          <div class="flex justify-between items-start mb-4">
-            <span class="text-on-surface-variant text-label-md font-medium">Structural Anomalies</span>
-            <span class="material-symbols-outlined text-error">rule</span>
-          </div>
-          <div>
-            <div class="font-headline-lg text-on-surface" style="font-size:28px; line-height:1.1;">{{ structural_issues }}</div>
-            <span class="text-body-sm {% if structural_issues > 0 %}text-error font-medium{% else %}text-tertiary-container{% endif %} mt-1 block">
-              {% if structural_issues > 0 %}Mismatched schema types{% else %}No anomalies found{% endif %}
-            </span>
-          </div>
-        </div>
-
+        <div style="font-size:24px;font-weight:700;">{{ total_missing | number_format }}</div>
+        <span class="text-xs {% if total_missing > 0 %}text-error{% else %}text-success{% endif %} mt-1" style="display:block;">
+          {% if total_missing > 0 %}Requires imputation or drop{% else %}No missing values{% endif %}
+        </span>
       </div>
 
-      <!-- ═══════════════════ ACCORDION OPERATIONS CENTER ═══════════════════ -->
-      <div class="flex flex-col gap-4">
+      <div class="card">
+        <div class="flex justify-between items-start mb-2">
+          <span class="text-sm text-secondary font-medium">Duplicates</span>
+          <span class="material-symbols-outlined text-accent" style="font-size:18px;">content_copy</span>
+        </div>
+        <div style="font-size:24px;font-weight:700;">{{ duplicates | number_format }}</div>
+        <span class="text-xs {% if duplicates > 0 %}text-accent{% else %}text-success{% endif %} mt-1" style="display:block;">
+          {% if duplicates > 0 %}Exact matches found{% else %}No duplicates{% endif %}
+        </span>
+      </div>
 
-        {# ── Column Selection & Retention ── #}
-        <div class="accordion-item" id="item-column-selection">
-          <div class="accordion-header" onclick="toggleAccordion('column-selection')">
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 rounded-lg bg-primary-fixed text-on-primary-fixed flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-[20px]">view_column</span>
-              </div>
-              <div>
-                <h3 class="font-headline-sm text-on-surface">Column Selection &amp; Drop Management</h3>
-                <p class="text-body-sm text-on-surface-variant">Review all {{ columns | length }} dataset columns. Check any columns you wish to drop permanently from the cleaned output.</p>
-              </div>
+      <div class="card">
+        <div class="flex justify-between items-start mb-2">
+          <span class="text-sm text-secondary font-medium">Text Casing</span>
+          <span class="material-symbols-outlined text-secondary" style="font-size:18px;">text_format</span>
+        </div>
+        <div style="font-size:24px;font-weight:700;">{{ text_issues | number_format }}</div>
+        <span class="text-xs text-secondary mt-1" style="display:block;">Mixed case issues</span>
+      </div>
+
+      <div class="card">
+        <div class="flex justify-between items-start mb-2">
+          <span class="text-sm text-secondary font-medium">Structural</span>
+          <span class="material-symbols-outlined text-error" style="font-size:18px;">rule</span>
+        </div>
+        <div style="font-size:24px;font-weight:700;">{{ structural_issues }}</div>
+        <span class="text-xs {% if structural_issues > 0 %}text-error{% else %}text-success{% endif %} mt-1" style="display:block;">
+          {% if structural_issues > 0 %}Schema anomalies{% else %}No anomalies{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- Accordion Operations -->
+    <div class="flex flex-col gap-4">
+
+      {# Column Selection #}
+      <div class="accordion-item active" id="item-column-selection">
+        <div class="accordion-header" onclick="toggleAccordion('column-selection')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">view_column</span>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="px-2.5 py-1 bg-surface-container-high text-on-surface-variant text-label-sm rounded-full font-semibold">{{ columns | length }} Columns</span>
-              <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-column-selection">expand_more</span>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Drop Columns</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">Select columns to remove from cleaned output. {{ columns | length }} columns total.</p>
             </div>
           </div>
-
-          <div class="accordion-body hidden" id="content-column-selection">
-            <div class="pt-4 flex flex-col gap-4 border-t border-border">
-              <p class="text-body-md text-on-surface-variant">
-                Select columns to exclude/drop. Checked columns will be permanently removed when cleaning operations execute.
-              </p>
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {% for col in columns %}
-                  <label class="p-3 bg-surface rounded-xl border border-border flex items-center justify-between gap-3 cursor-pointer hover:border-error transition-colors">
-                    <div class="flex items-center gap-3 min-w-0">
-                      <input type="checkbox" name="drop_columns" value="{{ col }}" class="mt-0.5 shrink-0" style="accent-color: var(--error); width: 1.1rem; height: 1.1rem; cursor: pointer;">
-                      <div class="min-w-0">
-                        <strong class="font-semibold text-on-surface text-body-md truncate block" title="{{ col }}">{{ col }}</strong>
-                        <span class="text-xs text-outline font-code-sm">{{ column_types.get(col, 'general') }}</span>
-                      </div>
-                    </div>
-                    <span class="px-2 py-0.5 rounded text-xs font-code-sm font-semibold bg-error-container text-error shrink-0">Drop</span>
-                  </label>
-                {% endfor %}
-              </div>
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">{{ columns | length }}</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-column-selection">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body" id="content-column-selection">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <div class="grid gap-3" style="grid-template-columns:repeat(3,1fr);">
+              {% for col in columns %}
+              <label class="flex items-center justify-between gap-3 p-3 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);transition:border-color 0.15s;">
+                <div class="flex items-center gap-3 min-w-0">
+                  <input type="checkbox" name="drop_columns" value="{{ col }}" style="accent-color:var(--error);width:1rem;height:1rem;cursor:pointer;">
+                  <div class="min-w-0">
+                    <strong class="font-semibold text-sm truncate" style="display:block;" title="{{ col }}">{{ col }}</strong>
+                    <span class="font-mono text-xs text-secondary">{{ column_types.get(col, 'general') }}</span>
+                  </div>
+                </div>
+                <span class="text-xs font-semibold text-error" style="background:var(--error-soft);padding:1px 6px;border-radius:3px;">Drop</span>
+              </label>
+              {% endfor %}
             </div>
           </div>
         </div>
+      </div>
 
-        {% for s in suggestions %}
+      {% for s in suggestions %}
 
-          {# ── Missing Values ── #}
-          {% if s.id == 'missing' %}
-            <div class="accordion-item" id="item-missing-values">
-              <div class="accordion-header" onclick="toggleAccordion('missing-values')">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-lg bg-error-container text-on-error-container flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-[20px]">data_alert</span>
-                  </div>
-                  <div>
-                    <h3 class="font-headline-sm text-on-surface">Missing Values Resolution</h3>
-                    <p class="text-body-sm text-on-surface-variant">{{ s.summary }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="px-2.5 py-1 bg-error-container text-on-error-container text-label-sm rounded-full font-semibold">High Priority</span>
-                  <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-missing-values">expand_more</span>
-                </div>
-              </div>
-
-              <div class="accordion-body hidden" id="content-missing-values">
-                <div class="pt-4 flex flex-col gap-4 border-t border-border">
-                  <p class="text-body-md text-on-surface-variant">Select automated imputation strategy or drop rows for columns containing missing records.</p>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {% for column, count in s.detail.items() %}
-                      <div class="p-4 bg-surface rounded-xl border border-border flex flex-col gap-3">
-                        <div class="flex justify-between items-center">
-                          <span class="font-headline-sm text-on-surface text-sm font-semibold">Column: {{ column }}</span>
-                          <span class="text-error font-code-sm font-bold text-xs">{{ count | number_format }} nulls</span>
-                        </div>
-                        <p class="text-body-sm text-on-surface-variant font-code-sm text-xs">{{ column_types.get(column, 'string') }} field</p>
-                        <input type="hidden" name="misscol_{{ loop.index }}" value="{{ column }}">
-                        <select name="missing_{{ loop.index }}" data-toggle="custom-{{ loop.index }}" class="select-styled">
-                          <option value="">— leave as is —</option>
-                          {% if column_types.get(column) == 'numeric' %}
-                            <option value="mean">Impute with Mean</option>
-                            <option value="median">Impute with Median (Recommended)</option>
-                          {% endif %}
-                          <option value="mode">Impute with Most Frequent (Mode)</option>
-                          <option value="remove">Drop rows with missing values</option>
-                          <option value="custom">Fill with custom value…</option>
-                        </select>
-                        <div class="hidden" id="custom-{{ loop.index }}">
-                          <input type="text" name="missingval_{{ loop.index }}" placeholder="Enter custom replacement..." class="input-styled custom-input">
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
+      {# Missing Values #}
+      {% if s.id == 'missing' %}
+      <div class="accordion-item active" id="item-missing-values">
+        <div class="accordion-header" onclick="toggleAccordion('missing-values')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--error-soft);color:var(--error);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">data_alert</span>
             </div>
-
-          {# ── Duplicate Records ── #}
-          {% elif s.id == 'duplicates' %}
-            <div class="accordion-item" id="item-duplicate-records">
-              <div class="accordion-header" onclick="toggleAccordion('duplicate-records')">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-lg bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-[20px]">difference</span>
-                  </div>
-                  <div>
-                    <h3 class="font-headline-sm text-on-surface">Duplicate Records Deduplication</h3>
-                    <p class="text-body-sm text-on-surface-variant">{{ s.summary }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="px-2.5 py-1 bg-secondary-fixed text-on-secondary-fixed text-label-sm rounded-full font-semibold">Medium Priority</span>
-                  <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-duplicate-records">expand_more</span>
-                </div>
-              </div>
-
-              <div class="accordion-body hidden" id="content-duplicate-records">
-                <div class="pt-4 flex flex-col gap-4 border-t border-border">
-                  <p class="text-body-md text-on-surface-variant">Configure deduplication matching algorithms and retention rules.</p>
-                  <div class="flex flex-col md:flex-row gap-4">
-                    <label class="flex-1 p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer">
-                      <input type="radio" name="dedup_mode" value="first" checked class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-                      <div>
-                        <span class="font-headline-sm text-on-surface block text-sm font-semibold mb-1">Keep First Occurrence</span>
-                        <span class="text-body-sm text-on-surface-variant">Preserves the earliest record and purges subsequent exact ID matches.</span>
-                      </div>
-                    </label>
-                  </div>
-                  <input type="hidden" name="op_duplicates" value="1">
-                </div>
-              </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Missing Values</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
             </div>
-
-          {# ── Text Casing & Formatting ── #}
-          {% elif s.id == 'text' %}
-            {% set ns = namespace(i=0) %}
-            <div class="accordion-item" id="item-text-casing">
-              <div class="accordion-header" onclick="toggleAccordion('text-casing')">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-lg bg-surface-container-high text-on-surface flex items-center justify-center shrink-0" style="font-size:18px; font-weight:700; font-family: var(--font-sans);">
-                    T
-                  </div>
-                  <div>
-                    <h3 class="font-headline-sm text-on-surface">Text Casing &amp; Formatting Standardization</h3>
-                    <p class="text-body-sm text-on-surface-variant">{{ s.summary }}</p>
-                  </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-error" style="background:var(--error-soft);padding:2px 8px;border-radius:4px;">High</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-missing-values">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body" id="content-missing-values">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <div class="grid gap-4" style="grid-template-columns:repeat(3,1fr);">
+              {% for column, count in s.detail.items() %}
+              <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+                <div class="flex justify-between items-center">
+                  <span class="font-semibold text-sm">{{ column }}</span>
+                  <span class="font-mono text-xs font-semibold text-error">{{ count | number_format }} nulls</span>
                 </div>
-                <div class="flex items-center gap-3">
-                  <span class="px-2.5 py-1 bg-surface-container-high text-on-surface-variant text-label-sm rounded-full font-semibold">Low Priority</span>
-                  <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-text-casing">expand_more</span>
-                </div>
-              </div>
-
-              <div class="accordion-body hidden" id="content-text-casing">
-                <div class="pt-4 flex flex-col gap-4 border-t border-border">
-                  <p class="text-body-md text-on-surface-variant">Standardize string attributes across all text columns for consistent querying.</p>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {% for column, finding in s.detail.items() %}
-                      {% set ns.i = ns.i + 1 %}
-                      <div class="p-4 bg-surface rounded-xl border border-border flex flex-col gap-3">
-                        <input type="hidden" name="textcol_{{ ns.i }}" value="{{ column }}">
-                        <span class="font-headline-sm text-on-surface text-sm font-semibold block">Column: {{ column }}</span>
-
-                        {% if finding.whitespace_cells %}
-                          <label class="flex items-center gap-3 cursor-pointer p-2 bg-surface-container-low rounded-lg">
-                            <input type="checkbox" name="op_trim" value="1" checked style="accent-color: var(--secondary); width:1rem; height:1rem;">
-                            <span class="text-body-sm text-on-surface">Strip leading/trailing spaces</span>
-                          </label>
-                        {% endif %}
-
-                        {% if finding.case_variants or finding.unique_values %}
-                          <div>
-                            <label class="text-body-sm text-on-surface font-medium block mb-1">Standardize Letter Case:</label>
-                            <select name="case_{{ ns.i }}" class="select-styled">
-                              <option value="">— leave as is —</option>
-                              <option value="lower">all lowercase</option>
-                              <option value="upper">ALL UPPERCASE</option>
-                              <option value="title">Title Case</option>
-                            </select>
-                          </div>
-
-                          {# Category mapping #}
-                          {% set mapping_list = [] %}
-                          {% if finding.unique_values and finding.unique_values | length > 1 and finding.unique_values | length <= 15 %}
-                            {% set mapping_list = finding.unique_values %}
-                          {% elif finding.case_variants %}
-                            {% for grp in finding.case_variants %}
-                              {% for v in grp %}{% set _ = mapping_list.append(v) %}{% endfor %}
-                            {% endfor %}
-                          {% endif %}
-
-                          {% if mapping_list %}
-                            <div class="pt-2 border-t border-border flex flex-col gap-2">
-                              <span class="text-label-sm font-semibold text-on-surface">Map to Standard Form:</span>
-                              {% for variant in mapping_list %}
-                                <div class="flex items-center gap-2">
-                                  <span class="font-code-sm text-xs px-2 py-1 rounded bg-surface-container text-on-surface truncate" style="max-width:110px;" title="{{ variant }}">{{ variant }}</span>
-                                  <span class="text-outline text-xs">→</span>
-                                  <input type="hidden" name="mapvar_{{ ns.i }}_{{ loop.index }}" value="{{ variant }}">
-                                  <input type="text" name="map_{{ ns.i }}_{{ loop.index }}" class="input-styled map-input" style="padding:4px 8px; font-size:12px;" placeholder="Standard name...">
-                                </div>
-                              {% endfor %}
-                            </div>
-                          {% endif %}
-                        {% endif %}
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          {# ── Structural / Anomalous Issues ── #}
-          {% elif s.id.startswith('issue_') %}
-            <div class="accordion-item" id="item-issue-{{ loop.index }}">
-              <div class="accordion-header" onclick="toggleAccordion('issue-{{ loop.index }}')">
-                <div class="flex items-center gap-4">
-                  <div class="w-10 h-10 rounded-lg bg-error-container text-on-error-container flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-[20px]">schema</span>
-                  </div>
-                  <div>
-                    <h3 class="font-headline-sm text-on-surface">Anomalous Structural Issues</h3>
-                    <p class="text-body-sm text-on-surface-variant">{{ s.summary }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="px-2.5 py-1 bg-error-container text-on-error-container text-label-sm rounded-full font-semibold">Critical</span>
-                  <span class="material-symbols-outlined text-on-surface-variant accordion-icon-toggle" id="icon-issue-{{ loop.index }}">expand_more</span>
-                </div>
-              </div>
-
-              <div class="accordion-body hidden" id="content-issue-{{ loop.index }}">
-                <div class="pt-4 flex flex-col gap-4 border-t border-border">
-                  {% if s.detail.issue == 'empty' %}
-                    <label class="p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer">
-                      <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" checked class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-                      <div>
-                        <strong class="font-headline-sm text-on-surface text-sm font-semibold block">Drop empty column: {{ s.detail.column }}</strong>
-                        <span class="text-body-sm text-on-surface-variant">This column contains 100% missing values across all rows.</span>
-                      </div>
-                    </label>
-                  {% elif s.detail.issue == 'mostly_missing' %}
-                    <label class="p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer">
-                      <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-                      <div>
-                        <strong class="font-headline-sm text-on-surface text-sm font-semibold block">Drop column: {{ s.detail.column }}</strong>
-                        <span class="text-body-sm text-on-surface-variant">{{ s.detail.detail }}</span>
-                      </div>
-                    </label>
-                  {% elif s.detail.issue == 'constant' %}
-                    <label class="p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer">
-                      <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-                      <div>
-                        <strong class="font-headline-sm text-on-surface text-sm font-semibold block">Drop constant column: {{ s.detail.column }}</strong>
-                        <span class="text-body-sm text-on-surface-variant">{{ s.detail.detail }}</span>
-                      </div>
-                    </label>
-                  {% elif s.detail.issue == 'invalid_date' %}
-                    <div class="p-4 bg-surface rounded-xl border border-border flex flex-col gap-3">
-                      <strong class="font-headline-sm text-on-surface text-sm font-semibold block">Invalid Dates: {{ s.detail.column }}</strong>
-                      <span class="text-body-sm text-on-surface-variant">{{ s.detail.detail }}</span>
-                      <input type="hidden" name="datecol_{{ loop.index }}" value="{{ s.detail.column }}">
-                      <select name="dateaction_{{ loop.index }}" class="select-styled">
-                        <option value="">— leave as is —</option>
-                        <option value="coerce">Set unparseable dates to null</option>
-                        <option value="remove">Remove rows with unparseable dates</option>
-                      </select>
-                    </div>
-                  {% elif s.detail.issue == 'invalid_email' %}
-                    <div class="p-4 bg-surface rounded-xl border border-border flex items-start gap-3">
-                      <span class="material-symbols-outlined text-secondary text-[20px] mt-0.5">info</span>
-                      <span class="text-body-sm text-on-surface-variant">{{ s.detail.detail }}</span>
-                    </div>
-                  {% else %}
-                    <p class="text-body-md text-on-surface-variant">{{ s.detail.detail if s.detail.detail is defined else s.summary }}</p>
+                <span class="font-mono text-xs text-secondary">{{ column_types.get(column, 'string') }}</span>
+                <input type="hidden" name="misscol_{{ loop.index }}" value="{{ column }}">
+                <select name="missing_{{ loop.index }}" data-toggle="custom-{{ loop.index }}" class="select-styled">
+                  <option value="">— leave as is —</option>
+                  {% if column_types.get(column) == 'numeric' %}
+                  <option value="mean">Impute with Mean</option>
+                  <option value="median">Impute with Median</option>
                   {% endif %}
+                  <option value="mode">Impute with Mode</option>
+                  <option value="remove">Drop rows with missing</option>
+                  <option value="custom">Custom value…</option>
+                </select>
+                <div class="hidden" id="custom-{{ loop.index }}">
+                  <input type="text" name="missingval_{{ loop.index }}" placeholder="Enter value..." class="input-styled custom-input">
                 </div>
               </div>
+              {% endfor %}
             </div>
+          </div>
+        </div>
+      </div>
 
-          {# ── Clean / All-Good Banner ── #}
-          {% elif s.id == 'clean' %}
-            <div class="p-6 bg-surface-container-lowest rounded-xl border border-border flex items-center gap-4">
-              <div class="w-10 h-10 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-[24px]">verified</span>
-              </div>
+      {# Duplicates #}
+      {% elif s.id == 'duplicates' %}
+      <div class="accordion-item active" id="item-duplicate-records">
+        <div class="accordion-header" onclick="toggleAccordion('duplicate-records')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">difference</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Duplicate Records</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-accent" style="background:var(--accent-soft);padding:2px 8px;border-radius:4px;">Medium</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-duplicate-records">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body" id="content-duplicate-records">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="radio" name="dedup_mode" value="first" checked style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
               <div>
-                <h3 class="font-headline-sm text-on-surface">{{ s.title }}</h3>
-                <p class="text-body-sm text-on-surface-variant">{{ s.summary }}</p>
+                <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Keep First Occurrence</span>
+                <span class="text-xs text-secondary">Preserves the earliest record and removes subsequent exact matches.</span>
               </div>
-            </div>
-          {% endif %}
-
-        {% endfor %}
+            </label>
+            <input type="hidden" name="op_duplicates" value="1">
+          </div>
+        </div>
       </div>
 
-      <!-- ═══════════════════ GLOBAL TRANSFORMATION PIPELINES ═══════════════════ -->
-      <div class="bg-surface-container-low p-space-xl rounded-xl border border-border flex flex-col gap-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="font-headline-md text-on-surface">Global Transformation Pipelines</h2>
-            <p class="text-body-md text-on-surface-variant mt-1">Apply secondary batch operations across the entire active dataset context.</p>
+      {# Text Casing #}
+      {% elif s.id == 'text' %}
+      {% set ns = namespace(i=0) %}
+      <div class="accordion-item active" id="item-text-casing">
+        <div class="accordion-header" onclick="toggleAccordion('text-casing')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--surface-raised);color:var(--text-primary);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;">
+              T
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Text Casing & Formatting</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
+            </div>
           </div>
-          <span class="material-symbols-outlined text-secondary text-[28px]">auto_fix_high</span>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Low</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-text-casing">expand_more</span>
+          </div>
         </div>
+        <div class="accordion-body" id="content-text-casing">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <div class="grid gap-4" style="grid-template-columns:repeat(3,1fr);">
+              {% for column, finding in s.detail.items() %}
+              {% set ns.i = ns.i + 1 %}
+              <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+                <input type="hidden" name="textcol_{{ ns.i }}" value="{{ column }}">
+                <span class="font-semibold text-sm">{{ column }}</span>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <label class="p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer hover:bg-surface-container" style="transition: background 0.15s;">
-            <input type="checkbox" name="op_trim" value="1" checked class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-            <div>
-              <span class="font-headline-sm text-on-surface block text-sm font-semibold mb-1">Trim Whitespace</span>
-              <span class="text-body-sm text-on-surface-variant">Strip leading/trailing &amp; double spaces from all text cells.</span>
-            </div>
-          </label>
+                {% if finding.whitespace_cells %}
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="op_trim" value="1" checked style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs">Strip whitespace</span>
+                </label>
+                {% endif %}
 
-          <label class="p-4 bg-surface rounded-xl border border-border flex items-start gap-4 cursor-pointer hover:bg-surface-container" style="transition: background 0.15s;">
-            <input type="checkbox" name="op_empty" value="1" class="mt-1" style="accent-color: var(--secondary); width:1rem; height:1rem;">
-            <div>
-              <span class="font-headline-sm text-on-surface block text-sm font-semibold mb-1">Remove Empty Columns</span>
-              <span class="text-body-sm text-on-surface-variant">Automatically drops any columns that have zero valid data values.</span>
-            </div>
-          </label>
+                {% if finding.case_variants or finding.unique_values %}
+                <div>
+                  <label class="text-xs font-medium" style="display:block;margin-bottom:4px;">Standardize case:</label>
+                  <select name="case_{{ ns.i }}" class="select-styled">
+                    <option value="">— leave as is —</option>
+                    <option value="lower">lowercase</option>
+                    <option value="upper">UPPERCASE</option>
+                    <option value="title">Title Case</option>
+                  </select>
+                </div>
 
-          <div class="p-4 bg-surface rounded-xl border border-border flex flex-col gap-3">
-            <span class="font-headline-sm text-on-surface text-sm font-semibold">Convert Column Types</span>
-            <div id="conversion-container" class="flex flex-col gap-2">
-              <div class="conversion-row flex flex-col gap-2">
-                <select name="convert_column" class="select-styled" aria-label="Select Column">
-                  <option value="">— Choose Column —</option>
-                  {% for col in columns %}
-                    <option value="{{ col }}">{{ col }}</option>
+                {% set mapping_list = [] %}
+                {% if finding.unique_values and finding.unique_values | length > 1 and finding.unique_values | length <= 15 %}
+                  {% set mapping_list = finding.unique_values %}
+                {% elif finding.case_variants %}
+                  {% for grp in finding.case_variants %}
+                    {% for v in grp %}{% set _ = mapping_list.append(v) %}{% endfor %}
                   {% endfor %}
-                </select>
-                <select name="convert_type" class="select-styled" aria-label="Target Data Type">
-                  <option value="">— Convert To Type —</option>
-                  <option value="integer">Integer</option>
-                  <option value="float">Float</option>
-                  <option value="string">Text</option>
-                  <option value="date">Date</option>
-                </select>
+                {% endif %}
+
+                {% if mapping_list %}
+                <div class="pt-2 border-t flex flex-col gap-2">
+                  <span class="text-xs font-semibold">Map to standard form:</span>
+                  {% for variant in mapping_list %}
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs truncate" style="max-width:100px;background:var(--surface);padding:2px 6px;border-radius:3px;" title="{{ variant }}">{{ variant }}</span>
+                    <span class="text-xs text-tertiary">→</span>
+                    <input type="hidden" name="mapvar_{{ ns.i }}_{{ loop.index }}" value="{{ variant }}">
+                    <input type="text" name="map_{{ ns.i }}_{{ loop.index }}" class="input-styled map-input" style="padding:3px 6px;font-size:12px;" placeholder="Standard name...">
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
               </div>
+              {% endfor %}
             </div>
-            <button type="button" id="add-conversion-btn" class="btn btn-sm btn-surface flex items-center gap-1 self-start">
-              <span class="material-symbols-outlined text-[14px]">add</span>
-              <span>Add Row</span>
-            </button>
           </div>
         </div>
       </div>
 
-    </div><!-- /max-w-7xl -->
+      {# Structural Issues #}
+      {% elif s.id.startswith('issue_') %}
+      <div class="accordion-item active" id="item-issue-{{ loop.index }}">
+        <div class="accordion-header" onclick="toggleAccordion('issue-{{ loop.index }}')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--error-soft);color:var(--error);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">schema</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Structural Issue</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-error" style="background:var(--error-soft);padding:2px 8px;border-radius:4px;">Critical</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-issue-{{ loop.index }}">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body" id="content-issue-{{ loop.index }}">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            {% if s.detail.issue == 'empty' %}
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" checked style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+              <div>
+                <strong class="font-semibold text-sm" style="display:block;">Drop empty column: {{ s.detail.column }}</strong>
+                <span class="text-xs text-secondary">100% missing values across all rows.</span>
+              </div>
+            </label>
+            {% elif s.detail.issue == 'mostly_missing' %}
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+              <div>
+                <strong class="font-semibold text-sm" style="display:block;">Drop column: {{ s.detail.column }}</strong>
+                <span class="text-xs text-secondary">{{ s.detail.detail }}</span>
+              </div>
+            </label>
+            {% elif s.detail.issue == 'constant' %}
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="checkbox" name="drop_columns" value="{{ s.detail.column }}" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+              <div>
+                <strong class="font-semibold text-sm" style="display:block;">Drop constant column: {{ s.detail.column }}</strong>
+                <span class="text-xs text-secondary">{{ s.detail.detail }}</span>
+              </div>
+            </label>
+            {% elif s.detail.issue == 'invalid_date' %}
+            <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <strong class="font-semibold text-sm">Invalid Dates: {{ s.detail.column }}</strong>
+              <span class="text-xs text-secondary">{{ s.detail.detail }}</span>
+              <input type="hidden" name="datecol_{{ loop.index }}" value="{{ s.detail.column }}">
+              <select name="dateaction_{{ loop.index }}" class="select-styled">
+                <option value="">— leave as is —</option>
+                <option value="coerce">Set unparseable dates to null</option>
+                <option value="remove">Remove rows with bad dates</option>
+              </select>
+            </div>
+            {% elif s.detail.issue == 'invalid_email' %}
+            <div class="p-4 rounded-lg flex items-start gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <span class="material-symbols-outlined text-accent" style="font-size:18px;margin-top:1px;">info</span>
+              <span class="text-xs text-secondary">{{ s.detail.detail }}</span>
+            </div>
+            {% else %}
+            <p class="text-sm text-secondary">{{ s.detail.detail if s.detail.detail is defined else s.summary }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
 
-    <!-- ═══════════════════ STICKY BOTTOM ACTION BAR ═══════════════════ -->
+      {# All Clean #}
+      {% elif s.id == 'clean' %}
+      <div class="card flex items-center gap-3">
+        <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--success-soft);color:var(--success);display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="font-size:20px;">verified</span>
+        </div>
+        <div>
+          <h3 style="font-size:14px;font-weight:600;margin:0;">{{ s.title }}</h3>
+          <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      {% endfor %}
+    </div>
+
+    <!-- Quick Cleaning Options -->
+    <div class="card mt-6" style="padding:0;overflow:hidden;">
+      <div class="flex items-center justify-between" style="padding:20px 24px;border-bottom:1px solid var(--border);">
+        <div>
+          <h2 style="font-size:16px;font-weight:600;margin:0;">Quick options</h2>
+          <p class="text-sm text-secondary" style="margin:4px 0 0;">Batch operations across the entire dataset.</p>
+        </div>
+      </div>
+      <div class="grid gap-4" style="padding:20px 24px;grid-template-columns:repeat(3,1fr);">
+        <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <input type="checkbox" name="op_trim" value="1" checked style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+          <div>
+            <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Trim Whitespace</span>
+            <span class="text-xs text-secondary">Strip leading/trailing & double spaces.</span>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <input type="checkbox" name="op_empty" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+          <div>
+            <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Remove Empty Columns</span>
+            <span class="text-xs text-secondary">Drop columns with zero valid values.</span>
+          </div>
+        </label>
+
+        <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <span class="font-semibold text-sm">Convert Column Types</span>
+          <div id="conversion-container" class="flex flex-col gap-2">
+            <div class="conversion-row flex flex-col gap-2">
+              <select name="convert_column" class="select-styled" aria-label="Select Column">
+                <option value="">— Column —</option>
+                {% for col in columns %}
+                <option value="{{ col }}">{{ col }}</option>
+                {% endfor %}
+              </select>
+              <select name="convert_type" class="select-styled" aria-label="Target Type">
+                <option value="">— Type —</option>
+                <option value="integer">Integer</option>
+                <option value="float">Float</option>
+                <option value="string">Text</option>
+                <option value="date">Date</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" id="add-conversion-btn" class="btn btn-sm btn-surface flex items-center gap-1" style="align-self:flex-start;">
+            <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+            Add Row
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky Action Bar -->
     <div class="sticky-action-bar">
       <div class="sticky-action-content">
-        <!-- Pulsing red dot + issue count (matches Stitch exactly) -->
+        <span class="text-sm text-secondary" id="active-ops-count">
+          {{ (total_missing + duplicates + text_issues + structural_issues) | number_format }} issues targeted
+        </span>
         <div class="flex items-center gap-3">
-          <span class="flex items-center justify-center" style="width:12px; height:12px; flex-shrink:0;">
-            <span class="block w-3 h-3 rounded-full bg-error" style="animation: pulse 1.5s cubic-bezier(0.4,0,0.6,1) infinite;"></span>
-          </span>
-          <span class="text-body-md text-on-surface font-medium" id="active-ops-count">
-            {{ (total_missing + duplicates + text_issues + structural_issues) | number_format }} total issues targeted for resolution
-          </span>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <a href="{{ url_for('dataset.show_dataset') }}" class="btn btn-surface">
-            Discard Changes
-          </a>
-          <button type="submit" class="btn btn-primary flex items-center gap-2 shadow-md" id="apply-cleaning-btn">
-            <span class="material-symbols-outlined text-[18px]">play_arrow</span>
-            <span>Execute Cleaning Pipeline</span>
+          <a href="{{ url_for('dataset.show_dataset') }}" class="btn btn-surface">Discard</a>
+          <button type="submit" class="btn btn-primary flex items-center gap-2" id="apply-cleaning-btn">
+            <span class="material-symbols-outlined" style="font-size:18px;">play_arrow</span>
+            Apply cleaning
           </button>
         </div>
       </div>
     </div>
 
   </form>
-
 </div>
-
-<style>
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-</style>
 {% endblock %}

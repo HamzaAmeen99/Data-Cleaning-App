@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pandas as pd
+from config import Config
 from flask import (
     Blueprint,
     abort,
@@ -14,10 +15,9 @@ from flask import (
     session,
     url_for,
 )
-
-from config import Config
-from utils.csrf import check_csrf
 from services import cleaning_service, file_service
+from services.dataset_session import dataset_session
+from utils.csrf import check_csrf
 from utils.validators import validate_column
 
 cleaning_bp = Blueprint("cleaning", __name__)
@@ -27,7 +27,7 @@ cleaning_bp = Blueprint("cleaning", __name__)
 def clean_dataset():
     """Parse the user's selected operations and apply them via the service."""
     check_csrf()
-    working_path = session.get("current_path") or session.get("upload_path")
+    working_path = dataset_session.working_path
     if not working_path:
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
@@ -46,7 +46,7 @@ def clean_dataset():
     cleaned_df, step_history = cleaning_service.apply_cleaning_operations(df, operations)
     after = _snapshot_stats(cleaned_df)
 
-    original_name = session.get("original_filename", "dataset")
+    original_name = dataset_session.original_filename
     try:
         output_path = file_service.export_dataset(cleaned_df, original_name, file_format="csv")
     except Exception:
@@ -93,7 +93,7 @@ def cleaning_result():
 
     return render_template(
         "results.html",
-        filename=session.get("original_filename", "dataset"),
+        filename=dataset_session.original_filename,
         before=session.get("before_stats", {}),
         after=session.get("after_stats", {}),
         history=session.get("cleaning_history", []),
@@ -120,7 +120,7 @@ def download_dataset():
     if file_format not in ("csv", "excel"):
         abort(404)
 
-    base_name = session.get("original_filename", "dataset")
+    base_name = dataset_session.original_filename
     stem = base_name.rsplit(".", 1)[0]
 
     if file_format == "csv":

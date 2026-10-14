@@ -108,12 +108,17 @@ app = create_app()
 app.config["TESTING"] = True
 messy_csv = Path(__file__).parent / "sample_messy_data.csv"
 
+# CSRF token must come from the same client (server-side sessions), so seed it in-flow
 with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        csrf = sess.get("csrf_token", "test-token")
+
     with open(messy_csv, "rb") as fh:
-        client.post("/upload", data={"file": (fh, "sample_messy_data.csv")})
+        client.post("/upload", data={"file": (fh, "sample_messy_data.csv"), "csrf_token": csrf})
 
     # Pass 1: Trim whitespace & deduplicate
-    res1 = client.post("/clean", data={"op_duplicates": "1", "op_trim": "1"}, follow_redirects=True)
+    res1 = client.post("/clean", data={"op_duplicates": "1", "op_trim": "1", "csrf_token": csrf}, follow_redirects=True)
     check("pass 1 clean succeeds", res1.status_code == 200 and b"Removed 2 duplicate row(s)" in res1.data)
 
     # Inspect overview/analysis for "Clean More"
@@ -126,6 +131,7 @@ with app.test_client() as client:
         data={
             "misscol_1": "CGPA",
             "missing_1": "median",
+            "csrf_token": csrf,
         },
         follow_redirects=True,
     )
@@ -138,7 +144,10 @@ with app.test_client() as client:
 
     # Reset to original upload
     res_reset = client.get("/dataset/reset", follow_redirects=True)
-    check("reset redirects to dataset overview", res_reset.status_code == 200 and b"Dataset Overview" in res_reset.data)
+    check(
+        "reset redirects to dataset overview",
+        res_reset.status_code == 200 and b"Column Information" in res_reset.data,
+    )
     # Overview after reset should have the original 20 rows
     check("reset restored original 20 rows", b"20" in res_reset.data)
 
@@ -149,7 +158,7 @@ with app.test_client() as client:
     # Upload corrupted file
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv")},
+        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv"), "csrf_token": csrf},
         content_type="multipart/form-data",
     )
     # Verify no unparseable_test.csv lingers in uploads

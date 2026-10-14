@@ -1,18 +1,18 @@
 """Dataset overview and analysis routes."""
 
 import pandas as pd
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
-
-from utils.csrf import check_csrf
 from config import Config
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from services import analysis_service, file_service
+from services.dataset_session import dataset_session
+from utils.csrf import check_csrf
 
 dataset_bp = Blueprint("dataset", __name__)
 
 
 def _load_current_dataset() -> pd.DataFrame | None:
     """Load the current working dataset referenced by the session."""
-    path = session.get("current_path") or session.get("upload_path")
+    path = dataset_session.working_path
     if not path:
         return None
     return file_service.load_dataset(path)
@@ -50,14 +50,11 @@ def show_dataset():
             "selected": is_selected,
         })
 
-    is_cleaned = bool(
-        session.get("processed_path")
-        or (session.get("current_path") and session.get("current_path") != session.get("upload_path"))
-    )
+    is_cleaned = dataset_session.is_cleaned
 
     return render_template(
         "dataset.html",
-        filename=session.get("original_filename", "dataset"),
+        filename=dataset_session.original_filename,
         overview=overview,
         total_missing=total_missing,
         duplicates=duplicates,
@@ -88,10 +85,7 @@ def dataset_analysis():
     }
     inconsistent = analysis["inconsistent_text"]
 
-    is_cleaned = bool(
-        session.get("processed_path")
-        or (session.get("current_path") and session.get("current_path") != session.get("upload_path"))
-    )
+    is_cleaned = dataset_session.is_cleaned
 
     # Summary counts for the bento-grid stat cards
     total_missing = sum(missing.values())
@@ -110,7 +104,7 @@ def dataset_analysis():
 
     return render_template(
         "cleaning.html",
-        filename=session.get("original_filename", "dataset"),
+        filename=dataset_session.original_filename,
         overview=analysis["overview"],
         suggestions=analysis["suggestions"],
         missing=missing,
@@ -131,15 +125,11 @@ def reset_dataset():
     """Reset the working dataset back to the original uploaded file."""
     if request.method == "POST":
         check_csrf()
-    upload_path = session.get("upload_path")
-    if not upload_path:
+    if not dataset_session.upload_path:
         flash("No uploaded dataset found.", "error")
         return redirect(url_for("upload.index"))
 
-    session["current_path"] = upload_path
-    session.pop("processed_path", None)
-    session["cleaning_history"] = []
-    session.pop("selected_columns", None)
+    dataset_session.reset()
     flash("Dataset reset back to the original upload.", "success")
     return redirect(url_for("dataset.show_dataset"))
 
@@ -151,7 +141,7 @@ def select_columns():
     """
     check_csrf()
 
-    working_path = session.get("current_path") or session.get("upload_path")
+    working_path = dataset_session.working_path
     if not working_path:
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
@@ -171,15 +161,27 @@ def select_columns():
         flash("Please select at least one column to continue.", "error")
         return redirect(url_for("dataset.show_dataset"))
 
-    if set(valid_selected) == set(all_cols):
-        # Nothing to drop — just proceed as normal
+    # Apply any column renames submitted from the edit column modal
+    renames = {}
+    for c in all_cols:
+        new_name = request.form.get(f"rename_{c}", "").strip()
+        if new_name and new_name != c:
+            renames[c] = new_name
+
+    if renames:
+        df = df.rename(columns=renames)
+        valid_selected = [renames.get(c, c) for c in valid_selected]
+        all_cols = [str(c) for c in df.columns]
+
+    if not renames and set(valid_selected) == set(all_cols):
+        # Nothing to drop or rename — just proceed as normal
         session.pop("selected_columns", None)
         flash("All columns kept. Proceeding to cleaning.", "success")
         return redirect(url_for("dataset.dataset_analysis"))
 
     # Drop unselected columns and save as new working file
     narrowed_df = df[valid_selected]
-    original_name = session.get("original_filename", "dataset")
+    original_name = dataset_session.original_filename
     try:
         output_path = file_service.export_dataset(narrowed_df, original_name, file_format="csv")
     except Exception:

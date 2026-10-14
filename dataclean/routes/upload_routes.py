@@ -1,12 +1,12 @@
 """Homepage, product intro and file upload routes."""
 
-import shutil
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from utils.csrf import check_csrf
 from services import file_service
+from services.dataset_session import dataset_session
 from utils.validators import validate_file
 
 upload_bp = Blueprint("upload", __name__)
@@ -14,7 +14,7 @@ upload_bp = Blueprint("upload", __name__)
 
 @upload_bp.route("/")
 def index():
-    """Show the product intro / landing page."""
+    """Show the product landing page."""
     return render_template("landing.html")
 
 
@@ -22,6 +22,12 @@ def index():
 def upload_page():
     """Show the file upload workspace."""
     return render_template("upload.html")
+
+
+@upload_bp.route("/upload/sample", methods=["GET"])
+def sample_redirect():
+    # The sample-dataset feature was removed; old bookmarks land on the upload page
+    return redirect(url_for("upload.upload_page"))
 
 
 @upload_bp.route("/upload", methods=["POST"])
@@ -56,32 +62,7 @@ def upload_dataset():
         flash("This file contains no data rows. Please upload a dataset with data.", "error")
         return redirect(url_for("upload.upload_page"))
 
-    session["upload_path"] = str(filepath)
-    session["current_path"] = str(filepath)
-    session["original_filename"] = filename
-    session.pop("processed_path", None)
-    session["cleaning_history"] = []
+    dataset_session.start_new(filepath, filename)
     flash("Dataset uploaded successfully.", "success")
     return redirect(url_for("dataset.show_dataset"))
 
-
-@upload_bp.route("/upload/sample", methods=["GET", "POST"])
-def load_sample():
-    """Load the built-in sample academic dataset for immediate testing."""
-    sample_source = Path(__file__).resolve().parent.parent / "tests" / "sample_messy_data.csv"
-    if not sample_source.exists():
-        flash("Sample dataset not found.", "error")
-        return redirect(url_for("upload.upload_page"))
-
-    upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    target = upload_dir / "sample_messy_data.csv"
-    shutil.copy(sample_source, target)
-
-    session["upload_path"] = str(target)
-    session["current_path"] = str(target)
-    session["original_filename"] = "sample_messy_data.csv"
-    session.pop("processed_path", None)
-    session["cleaning_history"] = []
-    flash("Sample dataset loaded successfully! Review the detected issues below.", "success")
-    return redirect(url_for("dataset.show_dataset"))

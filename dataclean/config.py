@@ -2,6 +2,7 @@
 # All tunable settings live here so nothing is hardcoded elsewhere.
 
 import os
+import secrets
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -10,7 +11,12 @@ BASE_DIR = Path(__file__).resolve().parent
 class Config:
     """Base application configuration."""
 
-    SECRET_KEY = os.environ.get("DATACLEAN_SECRET_KEY", "dev-key-change-me")
+    # Random per-boot key in dev sessions; set DATACLEAN_SECRET_KEY for a stable key in deployment
+    SECRET_KEY = os.environ.get("DATACLEAN_SECRET_KEY") or secrets.token_hex(32)
+
+    # Server-side sessions keep dataset state off the 4 KB cookie (only a SID travels)
+    SESSION_TYPE = "filesystem"
+    SESSION_FILE_DIR = BASE_DIR / "flask_session"
 
     # File storage (kept out of /static so uploads are never served directly)
     UPLOAD_FOLDER = BASE_DIR / "uploads"

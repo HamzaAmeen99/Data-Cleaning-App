@@ -1,25 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Error — DataClean OS{% endblock %}
+{% block title %}Error — DataClean{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto px-6 py-24 flex flex-col items-center text-center gap-6">
-  <div class="w-16 h-16 rounded-2xl bg-error-container text-on-error-container flex items-center justify-center shadow-sm">
-    <span class="material-symbols-outlined text-[36px]">error</span>
+<div style="max-width:480px;margin:80px auto;text-align:center;">
+  <div style="width:56px;height:56px;border-radius:var(--radius-xl);background:var(--error-soft);color:var(--error);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;">
+    <span class="material-symbols-outlined" style="font-size:28px;">error</span>
   </div>
 
-  <h1 class="font-headline-lg text-on-surface">Something Went Wrong</h1>
-  <p class="font-body-lg text-on-surface-variant max-w-md">
+  <h1 style="font-size:22px;font-weight:700;margin:0 0 8px;">Something went wrong</h1>
+  <p class="text-sm text-secondary" style="margin:0 0 24px;">
     {{ message or "An unexpected issue occurred while processing your dataset." }}
   </p>
 
-  <div class="flex items-center gap-3 pt-4">
-    <a href="{{ url_for('upload.index') }}" class="btn btn-primary btn-lg flex items-center gap-2">
-      <span class="material-symbols-outlined text-[18px]">home</span>
-      <span>Back to Homepage</span>
-    </a>
-    <a href="{{ url_for('upload.upload_page') }}" class="btn btn-surface btn-lg flex items-center gap-2">
-      <span class="material-symbols-outlined text-[18px]">upload_file</span>
-      <span>Upload Workspace</span>
+  <div class="flex items-center justify-center gap-3">
+    <a href="{{ url_for('upload.upload_page') }}" class="btn btn-primary">
+      Back to Upload
     </a>
   </div>
 </div>
