@@ -7,7 +7,7 @@ Run from the dataclean/ directory with:
 import secrets
 
 from config import Config
-from flask import Flask, flash, redirect, render_template, session, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session
 from routes import cleaning_bp, dataset_bp, upload_bp
 
@@ -31,6 +31,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         """Ensure every session has a CSRF token."""
         if "csrf_token" not in session:
             session["csrf_token"] = secrets.token_hex(32)
+
+    @app.after_request
+    def _cache_static_assets(response):
+        """Cache versioned static assets without caching private dataset files."""
+        if request.endpoint == "static" and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
     @app.context_processor
     def inject_globals():
