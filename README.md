@@ -92,6 +92,25 @@ Then open <http://127.0.0.1:5000> in your browser.
 
 Alternatively: `python app.py`.
 
+## Frontend assets
+
+IBM Plex and the subset of Material Symbols used by DataClean are bundled in
+`dataclean/static/fonts`, with their licenses. Visitors make no Google Fonts
+requests. To update these assets, run `python scripts/vendor_fonts.py` from
+`dataclean/`; this maintenance command requires internet access.
+
+At startup, `rcssmin` minifies the shared CSS, which is embedded in each page to
+avoid render-blocking stylesheet requests. Edit `static/css/style.css` normally,
+then restart the app to load changes. JavaScript and fonts use content-versioned
+`/assets/` URLs and one-year immutable caching; source changes automatically
+produce new URLs on restart. Only those public assets use this cache policy.
+
+For PythonAnywhere, install the updated `requirements.txt` and reload the web app.
+Leave `/assets/` handled by Flask (do not add a PythonAnywhere static mapping for
+that prefix), so its version validation and cache headers run. The existing
+`/static/` mapping can remain. Re-run PageSpeed against the deployed page after
+reloading; a saved report does not update when code changes.
+
 ## Supported file formats
 
 | Format | Extension | Notes |

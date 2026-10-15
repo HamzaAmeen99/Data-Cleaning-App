@@ -6,24 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="DataClean — fast, no-signup data cleaning for CSV and Excel files." />
   <title>{% block title %}DataClean{% endblock %}</title>
+  <link rel="icon" href="{{ asset_url('favicon.svg') }}" type="image/svg+xml" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-    rel="stylesheet" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&icon_names=add,arrow_forward,auto_fix_high,check_circle,cloud_upload,close,content_copy,dark_mode,data_alert,data_object,delete_forever,delete_sweep,difference,download,error,expand_more,history,home,info,light_mode,lock,logout,menu,play_arrow,query_stats,rule,schema,swap_horiz,sync,table_chart,table_rows,table_view,task_alt,text_format,tips_and_updates,tune,upload_file,verified,verified_user,view_column,warning&display=block"
-    rel="stylesheet" />
-
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=29" />
+  <link rel="preload" href="{{ asset_url('fonts/ibm-plex-sans-400-700-latin.woff2') }}" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="{{ asset_url('fonts/material-symbols-outlined-400-icons.woff2') }}" as="font" type="font/woff2" crossorigin />
+  <style>{{ frontend_css | safe }}</style>
 
   <script>
     (function() {
-      var saved = localStorage.getItem('dataclean-theme');
+      var saved;
+      try { saved = localStorage.getItem('dataclean-theme'); } catch (e) {}
       var systemTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       var defaultTheme = {% if request.endpoint == 'upload.index' %}'light'{% else %}systemTheme{% endif %};
-      var theme = saved || defaultTheme;
+      var theme = saved === 'dark' || saved === 'light' ? saved : defaultTheme;
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
@@ -216,7 +211,7 @@
   </div>
   {% endif %}
 
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=26"></script>
+  <script src="{{ asset_url('js/app.js') }}" defer></script>
 </body>
 
 </html>

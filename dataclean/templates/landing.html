@@ -3,7 +3,7 @@
 
 {% block content %}
 <section class="landing-hero" aria-labelledby="hero-title">
-  <div class="hero-copy" data-reveal>
+  <div class="hero-copy">
     <div class="hero-eyebrow"><span class="eyebrow-dot"></span>No-code data preparation for higher education</div>
     <h1 id="hero-title">Clean data you can <span>explain.</span></h1>
     <p class="hero-lede">Turn messy CSV and Excel files into dependable datasets through a clear, reviewable workflow. You choose every fix.</p>
@@ -17,11 +17,11 @@
     </div>
   </div>
 
-  <div class="product-window" data-reveal aria-label="Preview of a dataset health check">
+  <div class="product-window" role="group" aria-label="Preview of a dataset health check">
     <div class="product-window-bar">
       <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
       <span class="window-title">student_outcomes.csv</span>
-      <span class="window-status"><i></i> Analyzed</span>
+      <span class="window-status" role="img" aria-label="Analyzed"><i></i><span aria-hidden="true">Analyzed</span></span>
     </div>
     <div class="product-window-body">
       <div class="preview-heading">
@@ -34,11 +34,11 @@
         <div><span>Columns</span><strong>24</strong></div>
         <div><span>Missing</span><strong class="preview-warning">184</strong></div>
       </div>
-      <div class="preview-table" aria-label="Sample rows from student_outcomes.csv">
-        <div class="preview-row preview-table-head"><span>Student</span><span>Programme</span><span>Score</span></div>
-        <div class="preview-row"><span>Amina Yusuf</span><span>Biology</span><span>82.4</span></div>
-        <div class="preview-row preview-row-issue"><span>Marcus Lee</span><span class="cell-empty">Missing</span><span>76.8</span></div>
-        <div class="preview-row"><span>Sofia Martin</span><span>Economics</span><span>91.2</span></div>
+      <div class="preview-table" role="table" aria-label="Sample rows from student_outcomes.csv">
+        <div class="preview-row preview-table-head" role="row"><span role="columnheader">Student</span><span role="columnheader">Programme</span><span role="columnheader">Score</span></div>
+        <div class="preview-row" role="row"><span role="cell">Amina Yusuf</span><span role="cell">Biology</span><span role="cell">82.4</span></div>
+        <div class="preview-row preview-row-issue" role="row"><span role="cell">Marcus Lee</span><span class="cell-empty" role="cell">Missing</span><span role="cell">76.8</span></div>
+        <div class="preview-row" role="row"><span role="cell">Sofia Martin</span><span role="cell">Economics</span><span role="cell">91.2</span></div>
       </div>
       <div class="preview-action">
         <span><span class="material-symbols-outlined">tips_and_updates</span> Suggested: review 184 missing values</span>
@@ -73,7 +73,7 @@
     </div>
   </div>
 
-  <div class="audit-panel" data-reveal aria-label="Example cleaning audit trail">
+  <div class="audit-panel" role="group" data-reveal aria-label="Example cleaning audit trail">
     <div class="audit-header">
       <div><span class="audit-kicker">Cleaning log</span><strong>Review before export</strong></div>
       <span class="audit-count">03 operations</span>
