@@ -2,81 +2,89 @@
 {% block title %}DataClean — Clear data, confident decisions{% endblock %}
 
 {% block content %}
-<section class="landing-hero">
-  <div class="hero-copy">
-    <div class="hero-eyebrow"><span class="eyebrow-dot"></span>Private spreadsheet cleaning, in your session</div>
-    <h1>Make messy data<br><span>ready to use.</span></h1>
-    <p class="hero-lede">Inspect, reshape, and clean CSV or Excel files through a guided workflow built for careful data work.</p>
+<section class="landing-hero" aria-labelledby="hero-title">
+  <div class="hero-copy" data-reveal>
+    <div class="hero-eyebrow"><span class="eyebrow-dot"></span>No-code data preparation for higher education</div>
+    <h1 id="hero-title">Clean data you can <span>explain.</span></h1>
+    <p class="hero-lede">Turn messy CSV and Excel files into dependable datasets through a clear, reviewable workflow. You choose every fix.</p>
     <div class="hero-actions">
-      <a class="btn btn-primary btn-lg" href="{{ url_for('upload.upload_page') }}">Clean a dataset <span class="material-symbols-outlined">arrow_forward</span></a>
-      <a class="hero-text-link" href="#workflow">See the workflow</a>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('upload.upload_page') }}">Open the workspace <span class="material-symbols-outlined">arrow_forward</span></a>
+      <a class="hero-text-link" href="#workflow">See how it works</a>
     </div>
     <div class="hero-trust" id="privacy">
       <span><span class="material-symbols-outlined">lock</span>No account required</span>
-      <span><span class="material-symbols-outlined">verified</span>CSV and Excel supported</span>
+      <span><span class="material-symbols-outlined">delete_sweep</span>Files removed when your session ends</span>
     </div>
   </div>
 
-  <div class="product-window" aria-label="DataClean workspace preview">
+  <div class="product-window" data-reveal aria-label="Preview of a dataset health check">
     <div class="product-window-bar">
-      <div class="window-dots"><span></span><span></span><span></span></div>
-      <span class="window-title">customer_data.csv</span>
-      <span class="window-status"><i></i> Ready</span>
+      <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <span class="window-title">student_outcomes.csv</span>
+      <span class="window-status"><i></i> Analyzed</span>
     </div>
     <div class="product-window-body">
       <div class="preview-heading">
         <div><span class="preview-kicker">Dataset health</span><strong>3 issues need attention</strong></div>
         <span class="health-score">87%</span>
       </div>
+      <div class="health-track" role="progressbar" aria-label="Dataset health score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="87"><span></span></div>
       <div class="preview-stats">
         <div><span>Rows</span><strong>12,840</strong></div>
         <div><span>Columns</span><strong>24</strong></div>
         <div><span>Missing</span><strong class="preview-warning">184</strong></div>
       </div>
-      <div class="preview-table">
-        <div class="preview-row preview-table-head"><span>Customer</span><span>Region</span><span>Revenue</span></div>
-        <div class="preview-row"><span>Leila Khan</span><span>North</span><span>$4,280</span></div>
-        <div class="preview-row preview-row-issue"><span>Marcus Lee</span><span class="cell-empty">Missing</span><span>$3,190</span></div>
-        <div class="preview-row"><span>Sofia Martin</span><span>West</span><span>$5,420</span></div>
+      <div class="preview-table" aria-label="Sample rows from student_outcomes.csv">
+        <div class="preview-row preview-table-head"><span>Student</span><span>Programme</span><span>Score</span></div>
+        <div class="preview-row"><span>Amina Yusuf</span><span>Biology</span><span>82.4</span></div>
+        <div class="preview-row preview-row-issue"><span>Marcus Lee</span><span class="cell-empty">Missing</span><span>76.8</span></div>
+        <div class="preview-row"><span>Sofia Martin</span><span>Economics</span><span>91.2</span></div>
       </div>
       <div class="preview-action">
-        <span><span class="material-symbols-outlined">tips_and_updates</span> Suggested: fill 184 missing values</span>
-        <span class="preview-action-button">Review</span>
+        <span><span class="material-symbols-outlined">tips_and_updates</span> Suggested: review 184 missing values</span>
       </div>
     </div>
   </div>
 </section>
 
-<section class="landing-section workflow-section" id="workflow">
-  <div class="section-intro">
-    <span class="section-kicker">A clear path through your data</span>
-    <h2>From upload to clean export</h2>
-    <p>Each step shows what changed and keeps you in control of the result.</p>
+<section class="landing-section workflow-section" id="workflow" aria-labelledby="workflow-title">
+  <div class="section-intro" data-reveal>
+    <span class="section-kicker">One guided workflow</span>
+    <h2 id="workflow-title">From an uncertain file to a trusted result.</h2>
+    <p>Move through four deliberate stages. Nothing changes until you review it, and every applied operation stays visible.</p>
   </div>
   <div class="workflow-grid">
-    <article class="workflow-step"><span class="step-number">01</span><div class="step-icon"><span class="material-symbols-outlined">upload_file</span></div><h3>Upload</h3><p>Choose a CSV or Excel file and let DataClean inspect its structure.</p></article>
-    <article class="workflow-step"><span class="step-number">02</span><div class="step-icon"><span class="material-symbols-outlined">view_column</span></div><h3>Shape</h3><p>Review column names and types, then keep only what belongs.</p></article>
-    <article class="workflow-step"><span class="step-number">03</span><div class="step-icon"><span class="material-symbols-outlined">auto_fix_high</span></div><h3>Clean</h3><p>Resolve missing values, duplicates, casing, and structural issues.</p></article>
-    <article class="workflow-step"><span class="step-number">04</span><div class="step-icon"><span class="material-symbols-outlined">download</span></div><h3>Export</h3><p>Review the audit trail and download a dependable final dataset.</p></article>
+    <article class="workflow-step" data-reveal><span class="step-number">01</span><div class="step-icon"><span class="material-symbols-outlined">upload_file</span></div><h3>Upload</h3><p>Choose a CSV or Excel file. DataClean reads its structure in your private session.</p></article>
+    <article class="workflow-step" data-reveal><span class="step-number">02</span><div class="step-icon"><span class="material-symbols-outlined">query_stats</span></div><h3>Explore</h3><p>Inspect rows, column types, missing values, and the issues that need attention.</p></article>
+    <article class="workflow-step" data-reveal><span class="step-number">03</span><div class="step-icon"><span class="material-symbols-outlined">auto_fix_high</span></div><h3>Clean</h3><p>Resolve missing values, duplicates, text, and types with controls you can see.</p></article>
+    <article class="workflow-step" data-reveal><span class="step-number">04</span><div class="step-icon"><span class="material-symbols-outlined">download</span></div><h3>Export</h3><p>Review the audit trail, then download a dependable final dataset.</p></article>
   </div>
 </section>
 
-<section class="landing-section capability-section" id="capabilities">
-  <div class="capability-copy">
-    <span class="section-kicker">Useful by design</span>
-    <h2>Everything you need for a careful cleanup.</h2>
-    <p>DataClean stays focused on common spreadsheet problems, with enough context to make confident choices.</p>
-    <a class="hero-text-link" href="{{ url_for('upload.upload_page') }}">Open the workspace <span class="material-symbols-outlined">arrow_forward</span></a>
+<section class="landing-section capability-section" id="capabilities" aria-labelledby="capabilities-title">
+  <div class="capability-copy" data-reveal>
+    <span class="section-kicker">Clarity at every decision</span>
+    <h2 id="capabilities-title">Fix what matters. Keep the evidence.</h2>
+    <p>DataClean gives students and teaching teams the context to correct common data-quality problems without code or hidden transformations.</p>
+    <div class="capability-list">
+      <div><span class="material-symbols-outlined">data_alert</span><p><strong>Find quality issues</strong><small>Surface missing values, duplicates, and inconsistent data types.</small></p></div>
+      <div><span class="material-symbols-outlined">tune</span><p><strong>Choose each fix</strong><small>Configure cleaning rules per column before applying them.</small></p></div>
+      <div><span class="material-symbols-outlined">history</span><p><strong>Trace every change</strong><small>See which operations produced the final dataset.</small></p></div>
+    </div>
   </div>
-  <div class="capability-list">
-    <div><span class="material-symbols-outlined">data_alert</span><p><strong>Find quality issues</strong><small>Surface missing values, duplicates, and inconsistent text.</small></p></div>
-    <div><span class="material-symbols-outlined">tune</span><p><strong>Choose each fix</strong><small>Configure cleaning rules per column before applying them.</small></p></div>
-    <div><span class="material-symbols-outlined">history</span><p><strong>Keep an audit trail</strong><small>See the operations that produced the final dataset.</small></p></div>
+
+  <div class="audit-panel" data-reveal aria-label="Example cleaning audit trail">
+    <div class="audit-header">
+      <div><span class="audit-kicker">Cleaning log</span><strong>Review before export</strong></div>
+      <span class="audit-count">03 operations</span>
+    </div>
+    <ol class="audit-list">
+      <li><span class="audit-index">01</span><div><strong>Removed exact duplicates</strong><small>23 rows removed</small></div><code>12,840 → 12,817</code></li>
+      <li><span class="audit-index">02</span><div><strong>Filled missing programme values</strong><small>Replacement: “Unknown”</small></div><code>184 cells</code></li>
+      <li><span class="audit-index">03</span><div><strong>Standardized enrolment dates</strong><small>Output format: YYYY-MM-DD</small></div><code>3 → 1 format</code></li>
+    </ol>
+    <div class="audit-assurance"><span class="material-symbols-outlined">verified_user</span><span><strong>Original preserved</strong>Your source file remains unchanged throughout the session.</span></div>
   </div>
 </section>
 
-<section class="landing-cta">
-  <div><span class="section-kicker">Your data is ready when you are</span><h2>Start with one spreadsheet.</h2></div>
-  <a class="btn btn-primary btn-lg" href="{{ url_for('upload.upload_page') }}">Clean a dataset <span class="material-symbols-outlined">arrow_forward</span></a>
-</section>
 {% endblock %}

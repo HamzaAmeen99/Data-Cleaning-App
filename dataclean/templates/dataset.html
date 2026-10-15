@@ -23,11 +23,6 @@
       Reset to Original
     </a>
     {% endif %}
-    <button type="button" class="btn btn-primary flex items-center gap-2"
-      onclick="document.getElementById('col-select-form').requestSubmit()">
-      <span class="material-symbols-outlined" style="font-size:18px;">auto_fix_high</span>
-      Configure Cleaning
-    </button>
   </div>
 </div>
 
@@ -175,11 +170,8 @@
         </tbody>
       </table>
     </div>
-    <div class="flex justify-between items-center" style="padding:10px 20px; border-top:1px solid var(--border); background:var(--surface-raised);">
+    <div class="flex items-center" style="padding:10px 20px; border-top:1px solid var(--border); background:var(--surface-raised);">
       <span class="text-xs text-secondary">{{ preview_shown }} of {{ total_rows | number_format }} rows</span>
-      <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('col-select-form').requestSubmit()">
-        Apply & Continue
-      </button>
     </div>
   </div>
 
@@ -219,14 +211,11 @@
     </div>
     <div style="padding:12px 16px; border-top:1px solid var(--border);">
       {% if total_missing > 0 %}
-      <div class="flex items-center justify-between text-xs text-secondary mb-2">
+      <div class="flex items-center justify-between text-xs text-secondary">
         <span>Missing values</span>
         <span class="text-error font-semibold">{{ total_missing | number_format }} cells</span>
       </div>
       {% endif %}
-      <button type="button" class="btn btn-primary w-full" onclick="document.getElementById('col-select-form').requestSubmit()">
-        Configure Cleaning
-      </button>
     </div>
   </div>
 </div>

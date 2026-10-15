@@ -141,12 +141,8 @@
       </tbody>
     </table>
   </div>
-  <div class="flex justify-between items-center" style="padding:10px 20px;border-top:1px solid var(--border);background:var(--surface-raised);">
+  <div class="flex items-center" style="padding:10px 20px;border-top:1px solid var(--border);background:var(--surface-raised);">
     <span class="text-xs text-secondary">{{ preview_shown }} of {{ total_rows | number_format }} rows</span>
-    <div class="flex items-center gap-2">
-      <a href="{{ url_for('cleaning.download_dataset', format='csv') }}" class="btn btn-sm btn-primary">CSV</a>
-      <a href="{{ url_for('cleaning.download_dataset', format='excel') }}" class="btn btn-sm btn-dark">Excel</a>
-    </div>
   </div>
 </div>
 

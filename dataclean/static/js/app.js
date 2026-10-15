@@ -12,7 +12,27 @@ document.addEventListener("DOMContentLoaded", () => {
   setupMobileNavigation();
   setupSessionEnding();
   setupLoadingScreen();
+  setupLandingReveals();
 });
+
+function setupLandingReveals() {
+  const items = document.querySelectorAll("[data-reveal]");
+  if (!items.length || !window.IntersectionObserver || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    items.forEach((item) => item.classList.add("is-visible"));
+    return;
+  }
+
+  document.documentElement.classList.add("reveal-ready");
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.12, rootMargin: "0px 0px -36px" });
+
+  items.forEach((item) => observer.observe(item));
+}
 
 let sessionEnding = false;
 let internalSessionNavigation = false;
@@ -467,15 +487,18 @@ function setupThemeToggle() {
 }
 
 function updateThemeToggleUI(theme) {
+  const button = document.getElementById("theme-toggle-btn");
   const icon = document.getElementById("theme-icon");
   const label = document.getElementById("theme-label");
   if (!icon || !label) return;
   if (theme === "dark") {
     icon.textContent = "light_mode";
     label.textContent = "Light Mode";
+    if (button) button.setAttribute("aria-label", "Switch to light mode");
   } else {
     icon.textContent = "dark_mode";
     label.textContent = "Dark Mode";
+    if (button) button.setAttribute("aria-label", "Switch to dark mode");
   }
 }
 
