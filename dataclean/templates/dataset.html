@@ -17,11 +17,14 @@
   </div>
   <div class="flex items-center gap-3">
     {% if is_cleaned %}
-    <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-surface flex items-center gap-2"
-      onclick="return confirm('Revert back to the uncleaned raw upload?')">
-      <span class="material-symbols-outlined" style="font-size:18px;">history</span>
-      Reset to Original
-    </a>
+    <form action="{{ url_for('dataset.reset_dataset') }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn-surface flex items-center gap-2"
+        onclick="return confirm('Revert back to the uncleaned raw upload?')">
+        <span class="material-symbols-outlined" style="font-size:18px;">history</span>
+        Reset to Original
+      </button>
+    </form>
     {% endif %}
   </div>
 </div>

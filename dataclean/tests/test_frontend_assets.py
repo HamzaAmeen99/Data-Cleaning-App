@@ -6,10 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from flask import Flask, render_template_string
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import create_app
 from config import Config
+from utils.frontend_assets import register_frontend_assets
 
 
 class FrontendAssetsTest(unittest.TestCase):
@@ -36,6 +39,8 @@ class FrontendAssetsTest(unittest.TestCase):
         self.assertNotIn("/*", css)
         self.assertIn("font-display:swap", css)
         self.assertNotIn("font-display:block", css)
+        self.assertIn(".text-clean-card{", css)
+        self.assertIn(".category-map-builder{", css)
         for url in set(re.findall(r"/assets/[^\s)\"']+\.woff2", css)):
             with self.client.get(url) as response:
                 self.assertEqual(response.status_code, 200)
@@ -67,6 +72,54 @@ class FrontendAssetsTest(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
             self.assertNotIn("immutable", response.headers.get("Cache-Control", ""))
         self.assertNotIn("immutable", self.client.get("/").headers.get("Cache-Control", ""))
+
+
+class FrontendAssetRefreshTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        static_root = Path(self.temp.name)
+        (static_root / "css").mkdir()
+        (static_root / "fonts").mkdir()
+        (static_root / "js").mkdir()
+        (static_root / "css" / "fonts.css").write_text("", encoding="utf-8")
+        (static_root / "css" / "style.css").write_text("body { color: red; }", encoding="utf-8")
+        (static_root / "js" / "app.js").write_text("window.build = 1;", encoding="utf-8")
+        (static_root / "favicon.svg").write_text("<svg></svg>", encoding="utf-8")
+
+        self.static_root = static_root
+        self.app = Flask(__name__, static_folder=str(static_root))
+        register_frontend_assets(self.app)
+
+        @self.app.get("/")
+        def page():
+            return render_template_string(
+                '<style>{{ frontend_css | safe }}</style>'
+                '<script src="{{ asset_url(\'js/app.js\') }}"></script>'
+            )
+
+        self.client = self.app.test_client()
+
+    def test_css_and_script_versions_refresh_after_source_edits(self):
+        first_page = self.client.get("/").get_data(as_text=True)
+        first_script = re.search(r'<script src="([^"]+)"', first_page)[1]
+        self.assertIn("body{color:red}", first_page)
+
+        (self.static_root / "css" / "style.css").write_text(
+            "body { color: rebeccapurple; }", encoding="utf-8"
+        )
+        (self.static_root / "js" / "app.js").write_text(
+            "window.build = 200;", encoding="utf-8"
+        )
+
+        second_page = self.client.get("/").get_data(as_text=True)
+        second_script = re.search(r'<script src="([^"]+)"', second_page)[1]
+        self.assertIn("body{color:rebeccapurple}", second_page)
+        self.assertNotEqual(first_script, second_script)
+        with self.client.get(first_script) as stale_response:
+            self.assertEqual(stale_response.status_code, 404)
+        with self.client.get(second_script) as current_response:
+            self.assertEqual(current_response.status_code, 200)
 
 
 if __name__ == "__main__":

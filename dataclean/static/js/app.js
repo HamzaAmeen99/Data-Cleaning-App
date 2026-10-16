@@ -4,9 +4,12 @@ document.addEventListener("DOMContentLoaded", () => {
   setupUploadFeedback();
   setupCustomValueToggle();
   setupTableSearch();
+  setupCategoryMapping();
   setupMultiColumnConversion();
+  setupValidationRules();
   setupDestructiveConfirm();
   setupActiveOperationsCount();
+  setupPreviewBinding();
   setupFlashAutoDismiss();
   setupThemeToggle();
   setupMobileNavigation();
@@ -32,6 +35,19 @@ function setupLandingReveals() {
   }, { threshold: 0.12, rootMargin: "0px 0px -36px" });
 
   items.forEach((item) => observer.observe(item));
+}
+
+function setupPreviewBinding() {
+  const form = document.getElementById("cleaning-form");
+  const dirty = form?.querySelector('input[name="preview_dirty"]');
+  if (!form || !dirty) return;
+  const markDirty = (event) => {
+    if (event.target.matches('input[type="hidden"]')) return;
+    if (event.target.matches("input, select, textarea") && !event.target.name) return;
+    dirty.value = "1";
+  };
+  form.addEventListener("change", markDirty);
+  form.addEventListener("input", markDirty);
 }
 
 let sessionEnding = false;
@@ -151,6 +167,9 @@ function setupLoadingScreen() {
 
       event.preventDefault();
       form.dataset.submitting = "true";
+      const submitter = event.submitter;
+      if (submitter?.hasAttribute("formaction")) form.action = submitter.formAction;
+      if (submitter?.hasAttribute("formmethod")) form.method = submitter.formMethod;
       if (title) title.textContent = form.dataset.loadingTitle;
       if (message) message.textContent = form.dataset.loadingMessage;
       screen.classList.remove("hidden");
@@ -394,33 +413,310 @@ function setupTableSearch() {
   });
 }
 
-// Dynamic multi-column conversion rows
-function setupMultiColumnConversion() {
-  const addBtn = document.getElementById("add-conversion-btn");
-  const container = document.getElementById("conversion-container");
-  if (!addBtn || !container) return;
+function setupCategoryMapping() {
+  const builders = Array.from(document.querySelectorAll(".category-map-builder"));
+  if (!builders.length) return;
 
-  addBtn.addEventListener("click", () => {
-    const firstRow = container.querySelector(".conversion-row");
-    if (!firstRow) return;
+  builders.forEach((builder) => {
+    const index = builder.dataset.mapIndex;
+    const target = builder.querySelector(".category-map-target");
+    const addBtn = builder.querySelector(".add-category-map");
+    const rules = builder.querySelector(".category-map-rules");
+    if (!index || !target || !addBtn || !rules) return;
 
-    const newRow = firstRow.cloneNode(true);
-    newRow.querySelectorAll("select").forEach((sel) => {
-      sel.selectedIndex = 0;
-    });
+    let ruleCounter = 0;
+    const refreshEmptyState = () => {
+      const hasRules = Boolean(rules.querySelector(".category-map-rule"));
+      rules.querySelector(".category-map-empty")?.toggleAttribute("hidden", hasRules);
+    };
+    const notifyChange = () => rules.dispatchEvent(new Event("change", { bubbles: true }));
+    const addHidden = (rule, name, value) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      rule.appendChild(input);
+    };
 
-    if (!newRow.querySelector(".remove-row-btn")) {
+    const commitRule = () => {
+      const selected = Array.from(
+        builder.querySelectorAll(".category-map-source-check:checked:not(:disabled)")
+      );
+      const standard = target.value.trim();
+      const changedSources = selected.filter((checkbox) => checkbox.value.trim() !== standard);
+      target.setCustomValidity(
+        !selected.length
+          ? "Select at least one source value."
+          : !standard
+            ? "Choose or type the standard label."
+            : !changedSources.length
+              ? "Select at least one value that differs from the standard label."
+              : ""
+      );
+      if (!target.reportValidity()) return false;
+
+      ruleCounter += 1;
+      const rule = document.createElement("div");
+      rule.className = "category-map-rule";
+      const summary = document.createElement("span");
+      summary.className = "category-map-rule-summary font-mono text-xs";
+      summary.textContent = `${selected.map((checkbox) => checkbox.value).join(", ")} -> ${standard}`;
+      rule.appendChild(summary);
+
+      changedSources.forEach((checkbox, sourceIndex) => {
+        const suffix = `${ruleCounter}_${sourceIndex + 1}`;
+        addHidden(rule, `mapvar_${index}_${suffix}`, checkbox.value);
+        addHidden(rule, `map_${index}_${suffix}`, standard);
+      });
+
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.className = "btn btn-sm btn-outline remove-row-btn";
-      removeBtn.innerHTML = "x";
-      removeBtn.title = "Remove this conversion";
-      removeBtn.addEventListener("click", () => newRow.remove());
-      newRow.appendChild(removeBtn);
+      removeBtn.className = "category-map-rule-remove";
+      removeBtn.setAttribute("aria-label", `Remove mapping to ${standard}`);
+      removeBtn.textContent = "\u00d7";
+      removeBtn.addEventListener("click", () => {
+        selected.forEach((checkbox) => {
+          checkbox.disabled = false;
+          checkbox.closest(".category-map-option")?.removeAttribute("aria-disabled");
+        });
+        rule.remove();
+        refreshEmptyState();
+        notifyChange();
+      });
+      rule.appendChild(removeBtn);
+      rules.appendChild(rule);
+
+      selected.forEach((checkbox) => {
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        checkbox.closest(".category-map-option")?.setAttribute("aria-disabled", "true");
+      });
+      target.value = "";
+      refreshEmptyState();
+      notifyChange();
+      return true;
+    };
+
+    addBtn.addEventListener("click", () => {
+      if (commitRule()) target.focus();
+    });
+    target.addEventListener("input", () => target.setCustomValidity(""));
+    builder.querySelectorAll(".category-map-source-check").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => target.setCustomValidity(""));
+    });
+    refreshEmptyState();
+  });
+}
+
+// Compact multi-column conversion editor
+function setupMultiColumnConversion() {
+  const addBtn = document.getElementById("add-conversion-btn");
+  const builder = document.getElementById("conversion-builder");
+  const list = document.getElementById("conversion-list");
+  const clearBtn = document.getElementById("clear-conversions-btn");
+  if (!addBtn || !builder || !list) return;
+
+  const column = document.getElementById("conversion-column");
+  const type = document.getElementById("conversion-type");
+  const format = document.getElementById("conversion-format");
+  const policy = document.getElementById("conversion-policy");
+  if (!column || !type || !format || !policy) return;
+
+  const notifyChange = () => list.dispatchEvent(new Event("change", { bubbles: true }));
+  const refreshEmptyState = () => {
+    const hasItems = Boolean(list.querySelector(".conversion-item"));
+    list.querySelector(".conversion-empty")?.toggleAttribute("hidden", hasItems);
+    if (clearBtn) clearBtn.hidden = !hasItems;
+  };
+
+  const addHidden = (item, name, value) => {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    item.appendChild(input);
+  };
+
+  addBtn.addEventListener("click", () => {
+    column.setCustomValidity(column.value ? "" : "Choose a column to convert.");
+    type.setCustomValidity(type.value ? "" : "Choose the target datatype.");
+    if (!column.reportValidity() || !type.reportValidity()) return;
+
+    Array.from(list.querySelectorAll(".conversion-item"))
+      .find((existing) => existing.dataset.column === column.value)
+      ?.remove();
+
+    const item = document.createElement("div");
+    item.className = "conversion-item";
+    item.dataset.column = column.value;
+
+    const summary = document.createElement("span");
+    summary.className = "conversion-item-summary font-mono text-xs";
+    const formatLabel = format.value ? ` / ${format.options[format.selectedIndex].text}` : "";
+    const policyLabel = policy.value === "coerce_to_missing" ? " / invalid to missing" : "";
+    summary.textContent = `${column.value} -> ${type.options[type.selectedIndex].text}${formatLabel}${policyLabel}`;
+    item.appendChild(summary);
+
+    addHidden(item, "convert_column", column.value);
+    addHidden(item, "convert_type", type.value);
+    addHidden(item, "convert_format", format.value);
+    addHidden(item, "convert_policy", policy.value);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "conversion-remove";
+    removeBtn.setAttribute("aria-label", `Remove conversion for ${column.value}`);
+    removeBtn.textContent = "\u00d7";
+    removeBtn.addEventListener("click", () => {
+      item.remove();
+      refreshEmptyState();
+      notifyChange();
+    });
+    item.appendChild(removeBtn);
+    list.appendChild(item);
+
+    column.value = "";
+    type.value = "";
+    format.value = "";
+    policy.value = "reject";
+    refreshEmptyState();
+    notifyChange();
+    column.focus();
+  });
+
+  [column, type].forEach((select) => {
+    select.addEventListener("change", () => select.setCustomValidity(""));
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    list.querySelectorAll(".conversion-item").forEach((item) => item.remove());
+    refreshEmptyState();
+    notifyChange();
+  });
+
+  refreshEmptyState();
+}
+
+function setupValidationRules() {
+  const form = document.getElementById("cleaning-form");
+  const column = document.getElementById("validation-column");
+  const rule = document.getElementById("validation-rule");
+  const action = document.getElementById("validation-action");
+  const tokens = document.getElementById("validation-tokens");
+  const addButton = document.getElementById("add-validation-rule");
+  const list = document.getElementById("validation-rule-list");
+  if (!form || !column || !rule || !action || !tokens || !addButton || !list) return;
+
+  const field = (id) => document.getElementById(id);
+  const parameters = Array.from(document.querySelectorAll(".validation-param"));
+  const setError = (control, message) => {
+    control.setCustomValidity(message);
+    if (message) control.reportValidity();
+    return !message;
+  };
+  const refresh = () => {
+    parameters.forEach((control) => {
+      const applies = (control.dataset.validationRules || "").split(" ").includes(rule.value);
+      control.hidden = !applies;
+      if (!applies) control.setCustomValidity("");
+    });
+    const setMissing = action.querySelector('option[value="set_missing"]');
+    if (setMissing) setMissing.disabled = rule.value === "required";
+    if (rule.value === "required" && action.value === "set_missing") action.value = "report";
+  };
+  const refreshEmpty = () => {
+    list.querySelector(".validation-empty")?.toggleAttribute(
+      "hidden", Boolean(list.querySelector(".validation-rule-item"))
+    );
+  };
+  const notifyChange = () => list.dispatchEvent(new Event("change", { bubbles: true }));
+
+  const addRule = () => {
+    parameters.forEach((control) => control.setCustomValidity(""));
+    if (!setError(column, column.value ? "" : "Choose a column to validate.")) return false;
+    if (!setError(rule, rule.value ? "" : "Choose a validation rule.")) return false;
+
+    const operation = {
+      type: "validate",
+      column: column.value,
+      rule: rule.value,
+      action: action.value || "report",
+      tokens: tokens.checked ? ["n/a", "na", "null", "-", "--"] : [],
+    };
+    let detail = "";
+    if (rule.value === "range") {
+      const minimum = field("validation-min");
+      const maximum = field("validation-max");
+      if (!minimum.value && !maximum.value) {
+        setError(minimum, "Enter a minimum, maximum, or both.");
+        return false;
+      }
+      if (minimum.value) operation.minimum = minimum.value;
+      if (maximum.value) operation.maximum = maximum.value;
+      if (minimum.value && maximum.value && Number(minimum.value) > Number(maximum.value)) {
+        setError(minimum, "Minimum cannot exceed maximum.");
+        return false;
+      }
+      detail = `${minimum.value || "-inf"} to ${maximum.value || "inf"}`;
+    } else if (rule.value === "allowed") {
+      const values = field("validation-values");
+      operation.values = values.value.split(",").map((value) => value.trim()).filter(Boolean);
+      if (!setError(values, operation.values.length ? "" : "Enter at least one allowed value.")) return false;
+      detail = operation.values.join(", ");
+    } else if (rule.value === "pattern") {
+      const pattern = field("validation-pattern");
+      if (!setError(pattern, pattern.value ? "" : "Enter a pattern.")) return false;
+      operation.pattern = pattern.value;
+      detail = pattern.value;
+    } else if (rule.value === "outlier") {
+      const multiplier = field("validation-multiplier");
+      operation.multiplier = multiplier.value || "1.5";
+      const value = Number(operation.multiplier);
+      if (!setError(multiplier, value >= 0.5 && value <= 10 ? "" : "Use a multiplier from 0.5 to 10.")) return false;
+      detail = `${operation.multiplier}x IQR`;
     }
 
-    container.appendChild(newRow);
-  });
+    const item = document.createElement("div");
+    item.className = "validation-rule-item";
+    const summary = document.createElement("span");
+    summary.className = "font-mono text-xs";
+    const actionLabel = operation.action === "report" ? "report" : operation.action.replace("_", " ");
+    summary.textContent = `${operation.column} / ${operation.rule}${detail ? `: ${detail}` : ""} / ${actionLabel}`;
+    item.appendChild(summary);
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "validation_rule_json";
+    hidden.value = JSON.stringify(operation);
+    item.appendChild(hidden);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "conversion-remove";
+    remove.setAttribute("aria-label", `Remove validation rule for ${operation.column}`);
+    remove.textContent = "\u00d7";
+    remove.addEventListener("click", () => {
+      item.remove();
+      refreshEmpty();
+      notifyChange();
+    });
+    item.appendChild(remove);
+    list.appendChild(item);
+
+    column.value = "";
+    rule.value = "";
+    action.value = "report";
+    tokens.checked = false;
+    parameters.forEach((control) => { control.value = ""; });
+    refresh();
+    refreshEmpty();
+    notifyChange();
+    return true;
+  };
+
+  addButton.addEventListener("click", addRule);
+  rule.addEventListener("change", refresh);
+  [column, rule].forEach((control) => control.addEventListener("change", () => control.setCustomValidity("")));
+  refresh();
+  refreshEmpty();
 }
 
 // Track active operations and display on submit button
@@ -433,15 +729,17 @@ function setupActiveOperationsCount() {
   const countActive = () => {
     let count = 0;
 
-    form.querySelectorAll('input[type="checkbox"]:checked').forEach(() => count++);
+    form.querySelectorAll('input[type="checkbox"][name]:checked').forEach(() => count++);
 
-    form.querySelectorAll("select").forEach((sel) => {
+    form.querySelectorAll('select[name]:not([name^="convert_"])').forEach((sel) => {
       if (sel.value && sel.value !== "") count++;
     });
 
-    form.querySelectorAll(".map-input").forEach((inp) => {
-      if (inp.value && inp.value.trim() !== "") count++;
-    });
+    const conversionItems = form.querySelectorAll(".conversion-item").length;
+    count += conversionItems;
+
+    count += form.querySelectorAll(".category-map-rule").length;
+    count += form.querySelectorAll(".validation-rule-item").length;
 
     if (countDisplay) {
       countDisplay.textContent = count + " active operation(s) configured";
@@ -459,8 +757,12 @@ function setupDestructiveConfirm() {
   if (!form) return;
 
   form.addEventListener("submit", (e) => {
-    const removesRows = Array.from(form.querySelectorAll("select"))
-      .some((select) => select.value === "remove");
+    const removesRows = Array.from(form.querySelectorAll("select[name]"))
+      .some((select) => select.value === "remove")
+      || Array.from(form.querySelectorAll('input[name="validation_rule_json"]'))
+        .some((input) => {
+          try { return JSON.parse(input.value).action === "remove"; } catch (error) { return false; }
+        });
 
     const dropsCols = Array.from(form.querySelectorAll('input[name="drop_columns"]:checked')).length > 0;
 

@@ -1,13 +1,11 @@
 """Homepage, product intro and file upload routes."""
 
-from pathlib import Path
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-
-from utils.csrf import check_csrf
 from services import file_service
 from services.dataset_session import dataset_session
-from utils.validators import validate_file
+from utils.csrf import check_csrf
+from utils.validators import dataset_limit_error, validate_file
 
 upload_bp = Blueprint("upload", __name__)
 
@@ -60,7 +58,54 @@ def upload_dataset():
         flash("We couldn't save that file. Please try again.", "error")
         return redirect(url_for("upload.upload_page"))
 
-    dataset_session.start_new(filepath, filename)
+    # Optional CSV/Excel controls chosen on the upload form.
+    encoding = request.form.get("encoding", "") or None
+    if encoding not in (None, "utf-8", "utf-8-sig", "latin1"):
+        encoding = None
+    delimiter = request.form.get("delimiter", "") or "auto"
+    if delimiter not in ("auto", ",", ";", "\t"):
+        delimiter = "auto"
+    sheet = (request.form.get("sheet") or "").strip() or None
+
+    # Fail fast with a helpful message when the chosen worksheet is missing.
+    if filepath.suffix.lower() in (".xls", ".xlsx") and sheet:
+        sheets = file_service.list_excel_sheets(filepath)
+        if sheets and sheet not in sheets:
+            file_service.delete_file(filepath)
+            flash(
+                f"Worksheet '{sheet}' not found. This workbook has: {', '.join(sheets)}.",
+                "error",
+            )
+            return redirect(url_for("upload.upload_page"))
+
+    # Validate the new file before replacing an existing working session.
+    candidate, reason = file_service.load_dataset_with_error(
+        filepath,
+        encoding=encoding,
+        delimiter=delimiter,
+        sheet=sheet,
+    )
+    if candidate is None:
+        file_service.delete_file(filepath)
+        flash(f"We couldn't read this file. {reason}", "error")
+        return redirect(url_for("upload.upload_page"))
+    if candidate.empty:
+        file_service.delete_file(filepath)
+        flash("This file contains no data rows. Please choose another dataset.", "error")
+        return redirect(url_for("upload.upload_page"))
+    limit_error = dataset_limit_error(candidate)
+    if limit_error:
+        file_service.delete_file(filepath)
+        flash(limit_error, "error")
+        return redirect(url_for("upload.upload_page"))
+
+    dataset_session.start_new(
+        filepath,
+        filename,
+        encoding=encoding,
+        delimiter=delimiter,
+        sheet=sheet,
+    )
     flash("Dataset uploaded successfully.", "success")
     return redirect(url_for("dataset.show_dataset"))
 

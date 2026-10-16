@@ -14,3 +14,5 @@ dataclean/processed/*
 # Flask / environment
 .env
 instance/
+dataclean/flask_session/*
+!dataclean/flask_session/.gitkeep

@@ -65,7 +65,8 @@ def _register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(413)
     def too_large(_error):
-        flash("That file is too large. Please upload a file smaller than 16 MB.", "error")
+        limit_mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+        flash(f"That file is too large. Please upload a file smaller than {limit_mb} MB.", "error")
         return redirect(url_for("upload.index")), 302
 
     @app.errorhandler(404)

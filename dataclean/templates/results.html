@@ -19,7 +19,14 @@
       <span class="material-symbols-outlined" style="font-size:18px;">table_chart</span>
       Download Excel
     </a>
+    <a href="{{ url_for('cleaning.download_audit') }}" class="btn btn-surface flex items-center gap-2">
+      <span class="material-symbols-outlined" style="font-size:18px;">description</span>
+      Recipe &amp; Audit (JSON)
+    </a>
   </div>
+  <p class="text-xs text-secondary" style="margin:8px 20px 14px;">
+    Table values, leading-zero IDs and data types are written as-is. Workbook formatting, formulas and other worksheets are not preserved — dumps are plain data.
+  </p>
 </div>
 
 <!-- Before & After -->
@@ -97,6 +104,12 @@
     <span class="font-mono text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">{{ history | length }} actions</span>
   </div>
   <div style="padding:16px 20px;">
+    {% for run in runs %}
+    <div class="text-xs text-secondary font-mono" style="margin-bottom:4px;">
+      {{ run.ts }} — {{ run.event }} — rows {{ run.rows_before }} -> {{ run.rows_after }}
+      {% if run.operations %}-> {{ run.operations | map(attribute='type') | join(', ') }}{% endif %}
+    </div>
+    {% endfor %}
     {% if history %}
     <div class="flex flex-col gap-2">
       {% for item in history %}
@@ -153,10 +166,21 @@
       <span class="material-symbols-outlined" style="font-size:18px;">tune</span>
       Clean More
     </a>
-    <a href="{{ url_for('dataset.reset_dataset') }}" class="btn btn-outline flex items-center gap-2" onclick="return confirm('Revert all cleaning?')">
-      <span class="material-symbols-outlined" style="font-size:18px;">history</span>
-      Revert to Original
-    </a>
+    <form action="{{ url_for('dataset.undo_dataset') }}" method="post" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn-outline flex items-center gap-2" {% if not can_undo %}disabled{% endif %}
+        onclick="return confirm('Undo the latest cleaning run?')">
+        <span class="material-symbols-outlined" style="font-size:18px;">undo</span>
+        Undo Last Run
+      </button>
+    </form>
+    <form action="{{ url_for('dataset.reset_dataset') }}" method="post" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn-outline flex items-center gap-2" onclick="return confirm('Revert all cleaning?')">
+        <span class="material-symbols-outlined" style="font-size:18px;">history</span>
+        Revert to Original
+      </button>
+    </form>
   </div>
   <a href="{{ url_for('upload.upload_page') }}" class="btn btn-surface flex items-center gap-2">
     <span class="material-symbols-outlined" style="font-size:18px;">upload_file</span>

@@ -75,6 +75,31 @@
           </button>
         </div>
 
+        <!-- Import fidelity controls -->
+        <div class="grid gap-3" style="grid-template-columns:repeat(2,1fr);margin-top:14px;">
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--text-secondary);">
+            CSV encoding
+            <select name="encoding" class="select-styled" style="font-size:13px;">
+              <option value="utf-8" selected>UTF-8 (default)</option>
+              <option value="utf-8-sig">UTF-8 with BOM</option>
+              <option value="latin1">Latin-1 / ISO-8859-1</option>
+            </select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--text-secondary);">
+            CSV delimiter
+            <select name="delimiter" class="select-styled" style="font-size:13px;">
+              <option value="auto" selected>Auto-detect</option>
+              <option value=",">Comma ,</option>
+              <option value=";">Semicolon ;</option>
+              <option value="\t">Tab</option>
+            </select>
+          </label>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:12px;font-weight:600;color:var(--text-secondary);">
+          Excel worksheet name (optional — first sheet if left blank)
+          <input type="text" name="sheet" class="input-styled" placeholder="e.g. Sheet2" style="font-size:13px;">
+        </label>
+
         <button type="submit" class="btn btn-lg btn-primary w-full shadow-md flex items-center justify-center gap-2" id="upload-btn" style="margin-top:16px;">
           <span>Upload &amp; Analyze</span>
           <span class="material-symbols-outlined" style="font-size:18px;">arrow_forward</span>

@@ -23,10 +23,14 @@
     </div>
   </div>
 
-  <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form"
+  <form action="{{ url_for('cleaning.clean_dataset') }}" method="post" id="cleaning-form" novalidate
     data-loading-title="Cleaning your dataset"
     data-loading-message="Applying the selected operations and preparing your updated preview.">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if preview_token %}
+    <input type="hidden" name="preview_token" value="{{ preview_token }}">
+    <input type="hidden" name="preview_dirty" value="0">
+    {% endif %}
 
     <!-- Quick Stats -->
     <div class="grid gap-4 mb-6" style="grid-template-columns:repeat(4,1fr);">
@@ -72,6 +76,63 @@
         </span>
       </div>
     </div>
+
+    <!-- Preview Panel -->
+    {% if preview_result %}
+    <div class="card mb-6" style="padding:20px;border:1px solid var(--border);">
+      {% if preview_result.errors %}
+      <div style="color:var(--error);font-size:13px;">
+        <strong>Invalid plan — nothing applied:</strong>
+        <ul style="margin:6px 0 0 18px;padding:0;">
+          {% for error in preview_result.errors %}<li style="margin-bottom:2px;">{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <h2 style="font-size:15px;font-weight:600;margin:0 0 10px;">Preview (nothing applied yet)</h2>
+      <p class="text-xs text-secondary" style="margin:0 0 12px;">Rows: {{ preview_result.rows_before }} → {{ preview_result.rows_after }}</p>
+      <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px;">
+        {% for step in preview_result.steps %}
+        <div class="p-3 rounded" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <span class="font-mono text-xs text-secondary">{{ step.label }}</span>
+          <div style="font-size:16px;font-weight:700;">{{ step.affected }} affected</div>
+          <span class="text-xs text-secondary">{{ step.rows_removed }} rows, {{ step.cells_changed }} cells{% if step.columns_removed %}, {{ step.columns_removed | length }} columns removed{% endif %}{% if step.types_changed %}, {{ step.types_changed | length }} types changed{% endif %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if preview_result.warnings %}
+      <ul class="text-xs text-warning" style="margin:0 0 10px;padding-left:18px;">
+        {% for warning in preview_result.warnings %}<li style="margin-bottom:2px;">{{ warning }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if preview_result.examples %}
+      <div style="overflow-x:auto;">
+        <table style="font-size:12px;border-collapse:collapse;width:100%;">
+          <thead>
+            <tr style="text-align:left;">
+              <th style="padding:4px 10px;border-bottom:1px solid var(--border);">Row</th>
+              <th style="padding:4px 10px;border-bottom:1px solid var(--border);">Column</th>
+              <th style="padding:4px 10px;border-bottom:1px solid var(--border);">Operation</th>
+              <th style="padding:4px 10px;border-bottom:1px solid var(--border);">Before</th>
+              <th style="padding:4px 10px;border-bottom:1px solid var(--border);">After</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for example in preview_result.examples %}
+            <tr>
+              <td class="font-mono" style="padding:4px 10px;">{{ example.row }}</td>
+              <td class="font-mono" style="padding:4px 10px;">{{ example.column }}</td>
+              <td class="font-mono text-secondary" style="padding:4px 10px;">{{ example.operation }}</td>
+              <td class="font-mono" style="padding:4px 10px;">{% if example.before == none %}&lt;blank&gt;{% else %}{{ example.before }}{% endif %}</td>
+              <td class="font-mono" style="padding:4px 10px;">{% if example.after == none %}&lt;blank&gt;{% else %}{{ example.after }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
 
     <!-- Accordion Operations -->
     <div class="flex flex-col gap-4">
@@ -144,6 +205,13 @@
                 </div>
                 <span class="font-mono text-xs text-secondary">{{ column_types.get(column, 'string') }}</span>
                 <input type="hidden" name="misscol_{{ loop.index }}" value="{{ column }}">
+                {% if missing_tokens.get(column) %}
+                <span class="text-xs text-warning" style="display:block;">{{ missing_tokens[column] }} written as N/A / NULL / -</span>
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="misstok_{{ loop.index }}" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs">Treat missing tokens as missing</span>
+                </label>
+                {% endif %}
                 <select name="missing_{{ loop.index }}" data-toggle="custom-{{ loop.index }}" class="select-styled">
                   <option value="">— leave as is —</option>
                   {% if column_types.get(column) == 'numeric' %}
@@ -184,14 +252,43 @@
         </div>
         <div class="accordion-body" id="content-duplicate-records">
           <div class="pt-4 flex flex-col gap-4 border-t">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="op_duplicates" value="1" {% if duplicates > 0 %}checked{% endif %} style="accent-color:var(--accent);width:1rem;height:1rem;">
+              <span class="font-semibold text-sm">Remove matching duplicate rows</span>
+            </label>
             <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
               <input type="radio" name="dedup_mode" value="first" checked style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
               <div>
                 <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Keep First Occurrence</span>
-                <span class="text-xs text-secondary">Preserves the earliest record and removes subsequent exact matches.</span>
+                <span class="text-xs text-secondary">Preserves the earliest record and removes subsequent matches.</span>
               </div>
             </label>
-            <input type="hidden" name="op_duplicates" value="1">
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="radio" name="dedup_mode" value="last" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+              <div>
+                <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Keep Last Occurrence</span>
+                <span class="text-xs text-secondary">Preserves the latest record and removes earlier matches.</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <input type="radio" name="dedup_mode" value="all" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+              <div>
+                <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Remove All Occurrences</span>
+                <span class="text-xs text-secondary">Drops every row that has a duplicate, including the original entries.</span>
+              </div>
+            </label>
+            <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <span class="font-semibold text-sm" style="display:block;">Columns that define a duplicate</span>
+              <span class="text-xs text-secondary">Leave all unchecked to compare the entire row. Rows whose selected keys are missing are still compared against each other.</span>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                {% for col in columns %}
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="dedup_columns" value="{{ col }}" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs truncate" title="{{ col }}">{{ col }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -217,23 +314,25 @@
         </div>
         <div class="accordion-body" id="content-text-casing">
           <div class="pt-4 flex flex-col gap-4 border-t">
-            <div class="grid gap-4" style="grid-template-columns:repeat(3,1fr);">
+            <div class="text-cleaning-grid">
               {% for column, finding in s.detail.items() %}
               {% set ns.i = ns.i + 1 %}
-              <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <article class="text-clean-card">
                 <input type="hidden" name="textcol_{{ ns.i }}" value="{{ column }}">
-                <span class="font-semibold text-sm">{{ column }}</span>
-
-                {% if finding.whitespace_cells %}
-                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
-                  <input type="checkbox" name="op_trim" value="1" checked style="accent-color:var(--accent);width:1rem;height:1rem;">
-                  <span class="text-xs">Strip whitespace</span>
-                </label>
-                {% endif %}
+                <header class="text-clean-card-header">
+                  <div class="text-clean-card-icon" aria-hidden="true">
+                    <span class="material-symbols-outlined">text_fields</span>
+                  </div>
+                  <div class="min-w-0">
+                    <h4 title="{{ column }}">{{ column }}</h4>
+                  </div>
+                  <span class="text-clean-type">TEXT</span>
+                </header>
+                <div class="text-clean-card-body">
 
                 {% if finding.case_variants or finding.unique_values %}
-                <div>
-                  <label class="text-xs font-medium" style="display:block;margin-bottom:4px;">Standardize case:</label>
+                <div class="text-clean-control">
+                  <label>Letter case</label>
                   <select name="case_{{ ns.i }}" class="select-styled">
                     <option value="">— leave as is —</option>
                     <option value="lower">lowercase</option>
@@ -252,22 +351,107 @@
                 {% endif %}
 
                 {% if mapping_list %}
-                <div class="pt-2 border-t flex flex-col gap-2">
-                  <span class="text-xs font-semibold">Map to standard form:</span>
-                  {% for variant in mapping_list %}
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs truncate" style="max-width:100px;background:var(--surface);padding:2px 6px;border-radius:3px;" title="{{ variant }}">{{ variant }}</span>
-                    <span class="text-xs text-tertiary">→</span>
-                    <input type="hidden" name="mapvar_{{ ns.i }}_{{ loop.index }}" value="{{ variant }}">
-                    <input type="text" name="map_{{ ns.i }}_{{ loop.index }}" class="input-styled map-input" style="padding:3px 6px;font-size:12px;" placeholder="Standard name...">
+                <div class="category-map-builder" data-map-index="{{ ns.i }}" role="group" aria-labelledby="map-heading-{{ ns.i }}">
+                  <div class="category-map-header">
+                    <div class="category-map-header-icon" aria-hidden="true">
+                      <span class="material-symbols-outlined">merge_type</span>
+                    </div>
+                    <div class="category-map-copy">
+                      <strong id="map-heading-{{ ns.i }}">Map values in groups</strong>
+                      <span>Select equivalent values, then assign one standard label.</span>
+                    </div>
                   </div>
-                  {% endfor %}
+                  {% if finding.pending_mapping %}
+                  <div class="category-map-note">
+                    <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                    <span>Case was standardized, but these values still need mapping review.</span>
+                  </div>
+                  {% endif %}
+                  <div class="category-map-sources" aria-label="Values to map in {{ column }}">
+                    {% for variant in mapping_list %}
+                    <label class="category-map-option">
+                      <input type="checkbox" class="category-map-source-check" value="{{ variant }}">
+                      <span class="font-mono text-xs" title="{{ variant }}">{{ variant }}</span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                  <div class="category-map-action">
+                    <div>
+                      <label class="text-xs font-medium" for="map-target-{{ ns.i }}">Standard label</label>
+                      <input id="map-target-{{ ns.i }}" type="text" class="input-styled category-map-target" list="map-options-{{ ns.i }}" placeholder="Choose or type a label" autocomplete="off">
+                      <datalist id="map-options-{{ ns.i }}">
+                        {% for variant in mapping_list %}<option value="{{ variant }}"></option>{% endfor %}
+                      </datalist>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-surface add-category-map">
+                      <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+                      Add mapping
+                    </button>
+                  </div>
+                  <div class="category-map-rules" aria-live="polite">
+                    <span class="category-map-empty text-xs text-secondary">No mappings added yet.</span>
+                  </div>
                 </div>
                 {% endif %}
                 {% endif %}
-              </div>
+                </div>
+              </article>
               {% endfor %}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {# Validation & Anomalies (findings only; nothing is changed) #}
+      {% elif s.id == 'anomalies' %}
+      <div class="accordion-item active" id="item-anomalies">
+        <div class="accordion-header" onclick="toggleAccordion('anomalies')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--warning-soft,var(--surface-raised));color:var(--warning);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">query_stats</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Validation &amp; Anomalies</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">{{ s.summary }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-warning" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Review</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle open" id="icon-anomalies">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body" id="content-anomalies">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <p class="text-xs text-secondary">These findings are read-only: values are never changed automatically. Add a validation rule below, or map categories in the text section, to act on them.</p>
+            {% for title, findings, note in [
+              ('Mixed types', s.detail.mixed_types, 'cells of a different kind than the rest'),
+              ('Duplicate keys', s.detail.duplicate_keys, 'key values that repeat'),
+              ('Rare category values', s.detail.invalid_categories, 'uncommon values worth reviewing'),
+              ('Numeric outliers', s.detail.outliers, 'outside the 1.5×IQR bounds')
+            ] %}
+            {% if findings %}
+            <div class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <strong class="font-semibold text-sm">{{ title }}</strong>
+              <div class="grid gap-2" style="grid-template-columns:repeat(2,1fr);">
+                {% for column, finding in findings.items() %}
+                <div class="p-3 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <div class="flex justify-between items-center gap-2">
+                    <span class="font-semibold text-sm truncate" title="{{ column }}">{{ column }}</span>
+                    <span class="font-mono text-xs font-semibold text-warning">{{ finding.count | number_format }}</span>
+                  </div>
+                  <span class="text-xs text-secondary" style="display:block;">{{ note }}</span>
+                  {% if finding.examples %}
+                  <span class="font-mono text-xs text-secondary" style="display:block;word-break:break-word;">{{ finding.examples | join(', ') }}</span>
+                  {% endif %}
+                  {% if finding.lower is defined %}
+                  <span class="font-mono text-xs text-secondary" style="display:block;">bounds {{ '%g' | format(finding.lower) }} to {{ '%g' | format(finding.upper) }} ({{ finding.multiplier }}×IQR)</span>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -353,6 +537,184 @@
       {% endif %}
 
       {% endfor %}
+
+      {# Text & Column Tools: regex replace, split, merge #}
+      <div class="accordion-item" id="item-text-tools">
+        <div class="accordion-header" onclick="toggleAccordion('text-tools')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--surface-raised);color:var(--text-primary);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">auto_fix_high</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Text &amp; Column Tools</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">Regex replacement, column splitting and merging. Each is validated and previewed before it runs.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Optional</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle" id="icon-text-tools">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body hidden" id="content-text-tools">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <div class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <strong class="font-semibold text-sm">Find and replace with a regular expression</strong>
+              <span class="text-xs text-secondary">Example: pattern <code>\s+</code> with an empty replacement removes repeated spaces. Columns change only when this runs.</span>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                <select name="regex_column" class="select-styled" aria-label="Regex column">
+                  <option value="">— Column —</option>
+                  {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                </select>
+                <input type="text" name="regex_pattern" class="input-styled" placeholder="Pattern, e.g. \s+">
+                <input type="text" name="regex_replacement" class="input-styled" placeholder="Replace with (empty = delete)">
+              </div>
+            </div>
+
+            <div class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <strong class="font-semibold text-sm">Split one column into several</strong>
+              <span class="text-xs text-secondary">The original column is replaced by the new ones. Missing parts become blank.</span>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                <select name="split_column" class="select-styled" aria-label="Column to split">
+                  <option value="">— Column —</option>
+                  {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                </select>
+                <input type="text" name="split_separator" class="input-styled" placeholder="Separator, e.g. ,">
+                <input type="text" name="split_new_columns" class="input-styled" placeholder="New names, comma separated">
+              </div>
+            </div>
+
+            <div class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <strong class="font-semibold text-sm">Merge columns into one</strong>
+              <span class="text-xs text-secondary">Pick two or more columns. Blank parts are skipped, so no stray separators appear.</span>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                {% for col in columns %}
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="merge_columns" value="{{ col }}" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs truncate" title="{{ col }}">{{ col }}</span>
+                </label>
+                {% endfor %}
+              </div>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                <input type="text" name="merge_new_column" class="input-styled" placeholder="New column name">
+                <input type="text" name="merge_separator" class="input-styled" placeholder="Separator (default space)">
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="merge_keep" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs">Keep the original columns too</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Group-based filling #}
+      <div class="accordion-item" id="item-group-fill">
+        <div class="accordion-header" onclick="toggleAccordion('group-fill')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--error-soft);color:var(--error);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">tune</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Group-Based Filling</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">Fill blanks from the same group only. Groups with no known value are reported, never guessed.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Optional</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle" id="icon-group-fill">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body hidden" id="content-group-fill">
+          <div class="pt-4 flex flex-col gap-4 border-t">
+            <div class="grid gap-2" style="grid-template-columns:repeat(2,1fr);">
+              <select name="groupfill_column" class="select-styled" aria-label="Column to fill">
+                <option value="">— Column to fill —</option>
+                {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+              </select>
+              <select name="groupfill_method" class="select-styled" aria-label="Group fill method">
+                <option value="">— Method —</option>
+                <option value="mean">Group mean</option>
+                <option value="median">Group median</option>
+                <option value="mode">Group mode</option>
+                <option value="ffill">Repeat the last known value in the group</option>
+              </select>
+            </div>
+            <div class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+              <span class="font-semibold text-sm">Group by these columns</span>
+              <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+                {% for col in columns %}
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface);border:1px solid var(--border);">
+                  <input type="checkbox" name="groupfill_by" value="{{ col }}" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                  <span class="text-xs truncate" title="{{ col }}">{{ col }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Validation rules #}
+      <div class="accordion-item" id="item-validation">
+        <div class="accordion-header" onclick="toggleAccordion('validation')">
+          <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:18px;">rule</span>
+            </div>
+            <div>
+              <h3 style="font-size:14px;font-weight:600;margin:0;">Validation Rules</h3>
+              <p class="text-xs text-secondary" style="margin:2px 0 0;">Add several checks, review their findings, then decide whether any rule may change data.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-secondary" style="background:var(--surface-raised);padding:2px 8px;border-radius:4px;">Optional</span>
+            <span class="material-symbols-outlined text-secondary accordion-icon-toggle" id="icon-validation">expand_more</span>
+          </div>
+        </div>
+        <div class="accordion-body hidden" id="content-validation">
+          <div class="pt-4 flex flex-col gap-3 border-t">
+            <div class="grid gap-2" style="grid-template-columns:repeat(2,1fr);">
+              <select id="validation-column" class="select-styled" aria-label="Validation column">
+                <option value="">— Column —</option>
+                {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+              </select>
+              <select id="validation-rule" class="select-styled" aria-label="Validation rule">
+                <option value="">— Rule —</option>
+                <option value="required">Required (no blanks)</option>
+                <option value="unique">Unique (no duplicate keys)</option>
+                <option value="range">Within a numeric range</option>
+                <option value="allowed">Only allowed categories</option>
+                <option value="pattern">Matches a pattern</option>
+                <option value="outlier">Not a numeric outlier (1.5×IQR)</option>
+              </select>
+            </div>
+            <div class="grid gap-2" style="grid-template-columns:repeat(3,1fr);">
+              <input type="number" step="any" id="validation-min" class="input-styled validation-param" data-validation-rules="range" placeholder="Minimum" hidden>
+              <input type="number" step="any" id="validation-max" class="input-styled validation-param" data-validation-rules="range" placeholder="Maximum" hidden>
+              <input type="number" min="0.5" max="10" step="0.1" id="validation-multiplier" class="input-styled validation-param" data-validation-rules="outlier" placeholder="IQR multiplier (1.5)" hidden>
+            </div>
+            <input type="text" id="validation-values" class="input-styled validation-param" data-validation-rules="allowed" placeholder="Allowed values, comma separated" hidden>
+            <input type="text" id="validation-pattern" class="input-styled validation-param" data-validation-rules="pattern" placeholder="Pattern, e.g. ^\d{5}$" maxlength="128" hidden>
+            <div class="grid gap-2" style="grid-template-columns:repeat(2,1fr);">
+              <select id="validation-action" class="select-styled" aria-label="What to do with violations">
+                <option value="report">Report only (change nothing)</option>
+                <option value="set_missing">Set violating values to blank</option>
+                <option value="remove">Remove violating rows</option>
+              </select>
+              <label class="flex items-center gap-2 cursor-pointer p-2 rounded" style="background:var(--surface-raised);border:1px solid var(--border);">
+                <input type="checkbox" id="validation-tokens" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;">
+                <span class="text-xs">Count N/A, NULL, - as blank</span>
+              </label>
+            </div>
+            <button type="button" id="add-validation-rule" class="btn btn-sm btn-surface" style="align-self:flex-start;">
+              <span class="material-symbols-outlined" style="font-size:16px;">add</span> Add rule
+            </button>
+            <div id="validation-rule-list" class="validation-rule-list" aria-live="polite">
+              <span class="validation-empty text-xs text-secondary">No validation rules added.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Quick Cleaning Options -->
@@ -361,6 +723,7 @@
         <div>
           <h2 style="font-size:16px;font-weight:600;margin:0;">Quick options</h2>
           <p class="text-sm text-secondary" style="margin:4px 0 0;">Batch operations across the entire dataset.</p>
+          <p class="text-xs text-secondary font-mono" style="margin:4px 0 0;">Order: drop columns → empty columns → normalize → trim → split → merge → regex → duplicates → categories → case → missing values → group fill → invalid dates → type conversion → validation.</p>
         </div>
       </div>
       <div class="grid gap-4" style="padding:20px 24px;grid-template-columns:repeat(3,1fr);">
@@ -373,6 +736,35 @@
         </label>
 
         <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <input type="checkbox" name="op_normalize" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+          <div>
+            <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Normalize Unicode &amp; whitespace</span>
+            <span class="text-xs text-secondary">Turns full-width characters and non-breaking spaces into plain text in every text column.</span>
+          </div>
+        </label>
+
+        <label class="p-4 rounded-lg flex flex-col gap-2" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <span class="font-semibold text-sm">Date format</span>
+          <select name="date_format" class="select-styled" aria-label="Date format">
+            <option value="">Auto-detect</option>
+            <option value="%Y-%m-%d">YYYY-MM-DD</option>
+            <option value="%d/%m/%Y">DD/MM/YYYY</option>
+            <option value="%m/%d/%Y">MM/DD/YYYY</option>
+            <option value="%d-%m-%Y">DD-MM-YYYY</option>
+            <option value="%m-%d-%Y">MM-DD-YYYY</option>
+            <option value="%Y/%m/%d">YYYY/MM/DD</option>
+          </select>
+        </label>
+
+        <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <input type="checkbox" name="date_utc" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+          <div>
+            <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Normalize timezones to UTC</span>
+            <span class="text-xs text-secondary">Off by default. Existing timezone offsets are otherwise preserved.</span>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
           <input type="checkbox" name="op_empty" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
           <div>
             <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Remove Empty Columns</span>
@@ -380,28 +772,52 @@
           </div>
         </label>
 
-        <div class="p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
-          <span class="font-semibold text-sm">Convert Column Types</span>
-          <div id="conversion-container" class="flex flex-col gap-2">
-            <div class="conversion-row flex flex-col gap-2">
-              <select name="convert_column" class="select-styled" aria-label="Select Column">
-                <option value="">— Column —</option>
-                {% for col in columns %}
-                <option value="{{ col }}">{{ col }}</option>
-                {% endfor %}
-              </select>
-              <select name="convert_type" class="select-styled" aria-label="Target Type">
-                <option value="">— Type —</option>
-                <option value="integer">Integer</option>
-                <option value="float">Float</option>
-                <option value="string">Text</option>
-                <option value="date">Date</option>
-              </select>
-            </div>
+        <label class="flex items-start gap-3 p-4 rounded-lg cursor-pointer" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <input type="checkbox" name="date_dayfirst" value="1" style="accent-color:var(--accent);width:1rem;height:1rem;margin-top:2px;">
+          <div>
+            <span class="font-semibold text-sm" style="display:block;margin-bottom:2px;">Day-first dates</span>
+            <span class="text-xs text-secondary">Read 01/02/2024 as 1st of February in all date operations.</span>
           </div>
-          <button type="button" id="add-conversion-btn" class="btn btn-sm btn-surface flex items-center gap-1" style="align-self:flex-start;">
-            <span class="material-symbols-outlined" style="font-size:14px;">add</span>
-            Add Row
+        </label>
+
+        <div class="conversion-panel p-4 rounded-lg flex flex-col gap-3" style="background:var(--surface-raised);border:1px solid var(--border);">
+          <span class="font-semibold text-sm">Convert Column Types</span>
+              <p class="text-xs text-secondary">Invalid values leave the column unchanged unless you choose to replace them with missing values. Only conversions added below will run.</p>
+              <div id="conversion-builder" class="conversion-builder">
+                <select id="conversion-column" class="select-styled" aria-label="Select column to convert">
+              <option value="">— Column —</option>
+              {% for col in columns %}
+              <option value="{{ col }}">{{ col }}</option>
+              {% endfor %}
+            </select>
+                <select id="conversion-type" class="select-styled" aria-label="Target datatype">
+              <option value="">— Type —</option>
+              <option value="integer">Integer</option>
+              <option value="float">Float</option>
+              <option value="string">Text</option>
+              <option value="date">Date</option>
+              <option value="boolean">Yes/No</option>
+            </select>
+                <select id="conversion-format" class="select-styled" aria-label="Number format">
+              <option value="">Plain number (1234.56)</option>
+              <option value="us">US numbers (1,234.56)</option>
+              <option value="eu">European numbers (1.234,56)</option>
+            </select>
+                <select id="conversion-policy" class="select-styled" aria-label="Invalid conversion values">
+              <option value="reject">Reject invalid values</option>
+              <option value="coerce_to_missing">Replace invalid values with missing</option>
+            </select>
+            <button type="button" id="add-conversion-btn" class="btn btn-sm btn-surface flex items-center gap-1">
+              <span class="material-symbols-outlined" style="font-size:14px;">add</span>
+              Add conversion
+            </button>
+              </div>
+              <span class="text-xs text-secondary">Choose a column and type, then press Add conversion.</span>
+          <div id="conversion-list" class="conversion-list" aria-live="polite">
+            <span class="conversion-empty text-xs text-secondary">No additional conversions added.</span>
+          </div>
+          <button type="button" id="clear-conversions-btn" class="btn btn-sm btn-surface" hidden style="align-self:flex-start;">
+            Clear added conversions
           </button>
         </div>
       </div>
@@ -415,6 +831,10 @@
         </span>
         <div class="flex items-center gap-3">
           <a href="{{ url_for('dataset.show_dataset') }}" class="btn btn-surface">Discard</a>
+          <button type="submit" formaction="{{ url_for('dataset.preview_cleaning') }}" formmethod="post" class="btn btn-surface flex items-center gap-2" id="preview-btn">
+            <span class="material-symbols-outlined" style="font-size:18px;">visibility</span>
+            Preview changes
+          </button>
           <button type="submit" class="btn btn-primary flex items-center gap-2" id="apply-cleaning-btn">
             <span class="material-symbols-outlined" style="font-size:18px;">play_arrow</span>
             Apply cleaning
@@ -424,5 +844,55 @@
     </div>
 
   </form>
+
+  <section class="recipe-card" aria-labelledby="recipe-heading">
+    <div class="recipe-card-copy">
+      <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
+      <div>
+        <h2 id="recipe-heading">Reuse a cleaning recipe</h2>
+        <p>Upload an audit JSON from DataClean. It is checked against exact column names and dry-run before anything changes.</p>
+      </div>
+    </div>
+    <form action="{{ url_for('cleaning.inspect_recipe') }}" method="post" enctype="multipart/form-data" class="recipe-upload"
+      data-loading-title="Checking recipe compatibility"
+      data-loading-message="Dry-running every recipe step against this dataset. Nothing is being changed.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="file" name="recipe_file" accept="application/json,.json" required class="input-styled" aria-label="JSON recipe file">
+      <button type="submit" class="btn btn-surface">Review recipe</button>
+    </form>
+
+    {% if recipe_result %}
+    <div class="recipe-review {% if recipe_result.errors %}recipe-review-error{% endif %}">
+      {% if recipe_result.errors %}
+        <strong>Recipe cannot be used</strong>
+        <ul>{% for error in recipe_result.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+      {% else %}
+        <div class="recipe-review-summary">
+          <div><span>Runs</span><strong>{{ recipe_result.runs }}</strong></div>
+          <div><span>Rows</span><strong>{{ recipe_result.rows_before }} to {{ recipe_result.rows_after }}</strong></div>
+          <div><span>Columns</span><strong>{{ recipe_result.columns_before }} to {{ recipe_result.columns_after }}</strong></div>
+        </div>
+        {% if recipe_result.warnings %}
+        <ul class="recipe-warnings">{% for warning in recipe_result.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+        {% endif %}
+        <details class="recipe-details">
+          <summary>Review {{ recipe_result.steps | length }} operation(s)</summary>
+          <ul>{% for step in recipe_result.steps %}<li><code>{{ step.label }}</code> - {{ step.affected }} affected</li>{% endfor %}</ul>
+          {% if recipe_result.examples %}
+          <strong>Example changes</strong>
+          <ul>{% for example in recipe_result.examples %}<li><code>{{ example.column }}</code>: {{ example.before }} to {{ example.after }}</li>{% endfor %}</ul>
+          {% endif %}
+        </details>
+        <form action="{{ url_for('cleaning.apply_recipe') }}" method="post"
+          data-loading-title="Applying reviewed recipe"
+          data-loading-message="Rechecking every step and preparing one undoable result.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="recipe_token" value="{{ recipe_token }}">
+          <button type="submit" class="btn btn-primary">Apply reviewed recipe</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}
