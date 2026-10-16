@@ -1820,7 +1820,7 @@ body { letter-spacing: -0.005em; }
   color: #14221e;
 }
 
-.public-shell { min-height: 100vh; overflow-x: hidden; }
+.public-shell { min-height: 100vh; overflow-x: clip; }
 .public-main,
 .public-content { min-width: 0; }
 
