@@ -2,12 +2,10 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
-
 from flask import current_app, session
 
-from services import file_service
-from services.cleaning_service import convert_column_type
+from features.cleaning.operations import convert_column_type
+from workspace import file_store
 
 
 class DatasetSession:
@@ -18,8 +16,16 @@ class DatasetSession:
         return session.get("upload_path")
 
     @property
+    def baseline_path(self) -> str | None:
+        return session.get("baseline_path")
+
+    @property
     def working_path(self) -> str | None:
-        return session.get("current_path") or session.get("upload_path")
+        return (
+            session.get("current_path")
+            or session.get("baseline_path")
+            or session.get("upload_path")
+        )
 
     @property
     def original_filename(self) -> str:
@@ -27,11 +33,12 @@ class DatasetSession:
 
     @property
     def is_cleaned(self) -> bool:
+        baseline = session.get("baseline_path") or session.get("upload_path")
         return bool(
             session.get("processed_path")
             or (
                 session.get("current_path")
-                and session.get("current_path") != session.get("upload_path")
+                and session.get("current_path") != baseline
             )
         )
 
@@ -52,6 +59,14 @@ class DatasetSession:
             "delimiter": session.get("upload_delimiter"),
             "sheet": session.get("upload_sheet"),
         }
+
+    @property
+    def working_load_params(self) -> dict:
+        """Use source parsing settings only for a pre-snapshot legacy session."""
+        path = self.working_path
+        if path and Path(path).suffix.lower() == ".pkl":
+            return {}
+        return self.upload_load_params
 
     def apply_column_types(self, df):
         """Reapply user-selected types after loading an intermediate CSV."""
@@ -86,7 +101,10 @@ class DatasetSession:
 
     def _known_paths(self) -> set[str]:
         paths = {str(path) for path in session.get("owned_paths", []) if path}
-        for key in ("upload_path", "current_path", "processed_path", "excel_path", "csv_path"):
+        for key in (
+            "upload_path", "baseline_path", "current_path", "processed_path",
+            "excel_path", "csv_path",
+        ):
             if session.get(key):
                 paths.add(str(session[key]))
         for collection in ("history_stack", "audit_log"):
@@ -98,7 +116,8 @@ class DatasetSession:
     @staticmethod
     def _clear_workflow_state() -> None:
         for key in (
-            "upload_path", "current_path", "processed_path", "excel_path", "csv_path",
+            "upload_path", "baseline_path", "current_path", "processed_path",
+            "excel_path", "csv_path",
             "original_filename", "upload_encoding", "upload_delimiter", "upload_sheet",
             "selected_columns", "column_type_overrides", "cleaning_history", "step_history",
             "before_stats", "after_stats", "initial_stats", "cleaned_columns", "preview",
@@ -178,7 +197,7 @@ class DatasetSession:
         # There is no redo path, so an undone snapshot can be removed now.
         popped_path = popped.get("file")
         if popped_path:
-            file_service.delete_file(popped_path)
+            file_store.delete_file(popped_path)
             session["owned_paths"] = [
                 path for path in session.get("owned_paths", []) if path != popped_path
             ]
@@ -215,43 +234,52 @@ class DatasetSession:
 
     def start_new(
         self,
-        path: str,
+        source_path: str | Path,
+        baseline_path: str | Path,
         filename: str,
+        output_namespace: str,
         encoding: str | None = None,
         delimiter: str | None = None,
         sheet: str | None = None,
     ) -> None:
         """Register a fresh upload and discard any previous dataset's state."""
         for old_path in self._known_paths():
-            file_service.delete_file(old_path)
+            file_store.delete_file(old_path)
         self._clear_workflow_state()
         # Sweep files abandoned by earlier sessions before adding new ones.
-        file_service.sweep_stale_files(current_app.config["FILE_TTL_SECONDS"])
-        session["output_namespace"] = uuid4().hex
-        session["upload_path"] = str(path)
+        protected = (source_path, baseline_path)
+        file_store.sweep_stale_files(
+            current_app.config["FILE_TTL_SECONDS"],
+            protected_paths=protected,
+        )
+        session["output_namespace"] = output_namespace
+        session["upload_path"] = str(source_path)
+        session["baseline_path"] = str(baseline_path)
         session["original_filename"] = filename
         session["upload_encoding"] = encoding
         session["upload_delimiter"] = delimiter
         session["upload_sheet"] = sheet
-        session["current_path"] = str(path)
+        session["current_path"] = str(baseline_path)
         session["cleaning_history"] = []
         session["history_stack"] = []
         session["audit_log"] = []
-        session["owned_paths"] = [str(path)]
+        session["owned_paths"] = [str(source_path), str(baseline_path)]
 
     def reset(self, *, record_audit: bool = True) -> None:
-        """Point the working dataset back at the original upload.
+        """Point the working dataset back at its validated baseline snapshot.
 
         Discards the undo stack (and its now-unreferenced version files);
         the audit log survives so the history of what was done stays readable.
         """
-        upload_path = session.get("upload_path")
-        if not upload_path:
+        source_path = session.get("upload_path")
+        baseline_path = session.get("baseline_path") or source_path
+        if not baseline_path:
             return
-        for path in self._known_paths() - {str(upload_path)}:
-            file_service.delete_file(path)
-        session["owned_paths"] = [str(upload_path)]
-        session["current_path"] = upload_path
+        preserved = {str(path) for path in (source_path, baseline_path) if path}
+        for path in self._known_paths() - preserved:
+            file_store.delete_file(path)
+        session["owned_paths"] = list(preserved)
+        session["current_path"] = baseline_path
         session.pop("processed_path", None)
         session.pop("excel_path", None)
         session.pop("csv_path", None)
@@ -273,7 +301,7 @@ class DatasetSession:
     def end(self) -> None:
         """Delete files owned by the active session and clear its state."""
         for path in self._known_paths():
-            file_service.delete_file(path)
+            file_store.delete_file(path)
         session.clear()
 
 

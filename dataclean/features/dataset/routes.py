@@ -1,11 +1,15 @@
-"""Dataset overview and analysis routes."""
+﻿"""Dataset overview and analysis routes."""
 
 import pandas as pd
 from config import Config
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
-from services import analysis_service, cleaning_service, file_service
-from services.dataset_session import dataset_session
+from features.cleaning import operations as cleaning_operations
+from features.upload import dataset_importer
+from workspace import dataset_exporter
+from workspace.session import dataset_session
 from utils.csrf import check_csrf
+
+from features.dataset import analysis as analysis_tools
 
 dataset_bp = Blueprint("dataset", __name__)
 
@@ -15,7 +19,7 @@ def _load_current_dataset() -> pd.DataFrame | None:
     path = dataset_session.working_path
     if not path:
         return None
-    df = file_service.load_dataset(path, **dataset_session.upload_load_params)
+    df = dataset_importer.load_dataset(path, **dataset_session.working_load_params)
     return dataset_session.apply_column_types(df) if df is not None else None
 
 
@@ -44,9 +48,9 @@ def show_dataset():
         flash("This file contains no data rows. Please upload a dataset with data.", "error")
         return redirect(url_for("upload.upload_page"))
 
-    overview = analysis_service.get_dataset_overview(df)
-    missing = analysis_service.get_missing_values(df)
-    duplicates = analysis_service.get_duplicate_count(df)
+    overview = analysis_tools.get_dataset_overview(df)
+    missing = analysis_tools.get_missing_values(df)
+    duplicates = analysis_tools.get_duplicate_count(df)
     total_missing = sum(missing.values())
 
     preview_rows = df.head(Config.PREVIEW_ROWS)
@@ -100,7 +104,7 @@ def dataset_analysis():
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
 
-    analysis = analysis_service.analyze_dataset(
+    analysis = analysis_tools.analyze_dataset(
         df, session.get("pending_category_columns", [])
     )
 
@@ -180,26 +184,28 @@ def preview_cleaning():
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
 
-    df = file_service.load_dataset(working_path, **dataset_session.upload_load_params)
+    df = dataset_importer.load_dataset(
+        working_path, **dataset_session.working_load_params
+    )
     if df is None:
         flash("The uploaded dataset is no longer available. Please upload it again.", "error")
         return redirect(url_for("upload.index"))
     df = dataset_session.apply_column_types(df)
 
-    from routes.cleaning_routes import _parse_operations
+    from features.cleaning.routes import _parse_operations
 
     operations = _parse_operations(df)
     if not operations:
         flash("No cleaning operations were selected. Choose at least one option.", "error")
         return redirect(url_for("dataset.dataset_analysis"))
 
-    plan_errors = cleaning_service.validate_plan(df, operations)
+    plan_errors = cleaning_operations.validate_plan(df, operations)
     if plan_errors:
         session["preview"] = {"token": "", "dataset": None, "result": {"errors": plan_errors}}
         return redirect(url_for("dataset.dataset_analysis"))
 
-    result = cleaning_service.preview_plan(df, operations)
-    token = cleaning_service.operation_plan_token(operations)
+    result = cleaning_operations.preview_plan(df, operations)
+    token = cleaning_operations.operation_plan_token(operations)
     session["preview"] = {
         "token": token,
         "dataset": dataset_session.dataset_fingerprint(),
@@ -251,7 +257,9 @@ def select_columns():
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
 
-    df = file_service.load_dataset(working_path, **dataset_session.upload_load_params)
+    df = dataset_importer.load_dataset(
+        working_path, **dataset_session.working_load_params
+    )
     if df is None:
         flash("The uploaded dataset is no longer available. Please upload it again.", "error")
         return redirect(url_for("upload.index"))
@@ -260,7 +268,7 @@ def select_columns():
     selected = request.form.getlist("selected_columns")
     all_cols = [str(c) for c in df.columns]
 
-    # Validate — keep only columns that actually exist in the DataFrame
+    # Validate â€” keep only columns that actually exist in the DataFrame
     valid_selected = [c for c in selected if c in all_cols]
 
     if not valid_selected:
@@ -288,7 +296,7 @@ def select_columns():
             requested_types[column] = existing_types[column]
 
     for column, target_type in requested_types.items():
-        converted, report = cleaning_service.convert_column_type(
+        converted, report = cleaning_operations.convert_column_type(
             df, column, target_type
         )
         if not report.applied:
@@ -338,7 +346,7 @@ def select_columns():
         all_cols = [str(c) for c in df.columns]
 
     if not renames and not requested_types and set(valid_selected) == set(all_cols):
-        # Nothing to drop or rename — just proceed as normal
+        # Nothing to drop or rename â€” just proceed as normal
         session.pop("selected_columns", None)
         session.pop("recipe_preview", None)
         flash("All columns kept. Proceeding to cleaning.", "success")
@@ -349,7 +357,7 @@ def select_columns():
     original_name = dataset_session.original_filename
     try:
         # Pickle keeps the selected types intact between cleaning passes.
-        output_path = file_service.export_dataset(
+        output_path = dataset_exporter.export_dataset(
             narrowed_df,
             original_name,
             file_format="pickle",

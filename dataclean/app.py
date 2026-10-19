@@ -7,9 +7,11 @@ Run from the dataclean/ directory with:
 import secrets
 
 from config import Config
+from features.cleaning.routes import cleaning_bp
+from features.dataset.routes import dataset_bp
+from features.upload.routes import upload_bp
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session
-from routes import cleaning_bp, dataset_bp, upload_bp
 from utils.frontend_assets import register_frontend_assets
 
 

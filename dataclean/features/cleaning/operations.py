@@ -6,16 +6,15 @@ Nothing here silently guesses on the user's behalf: merging categories,
 changing case or dropping columns only happens when explicitly requested.
 """
 
-from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import math
 import re
 import unicodedata
+from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 
 import pandas as pd
-
 from utils.validators import validate_column
 
 DATE_FORMATS = (

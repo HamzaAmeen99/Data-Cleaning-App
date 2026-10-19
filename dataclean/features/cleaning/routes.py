@@ -1,11 +1,13 @@
-"""Cleaning application, results and download routes."""
+﻿"""Cleaning application, results and download routes."""
 
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 from config import Config
+from features.dataset import analysis as analysis_tools
+from features.upload import dataset_importer
 from flask import (
     Blueprint,
     Response,
@@ -19,10 +21,12 @@ from flask import (
     session,
     url_for,
 )
-from services import analysis_service, cleaning_service, file_service
-from services.dataset_session import dataset_session
+from workspace import dataset_exporter
+from workspace.session import dataset_session
 from utils.csrf import check_csrf
 from utils.validators import dataset_limit_error, validate_column
+
+from features.cleaning import operations as cleaning_operations
 
 cleaning_bp = Blueprint("cleaning", __name__)
 
@@ -36,7 +40,9 @@ def clean_dataset():
         flash("Please upload a dataset first.", "error")
         return redirect(url_for("upload.index"))
 
-    df = file_service.load_dataset(working_path, **dataset_session.upload_load_params)
+    df = dataset_importer.load_dataset(
+        working_path, **dataset_session.working_load_params
+    )
     if df is None:
         flash("The uploaded dataset is no longer available. Please upload it again.", "error")
         return redirect(url_for("upload.index"))
@@ -54,10 +60,10 @@ def clean_dataset():
             request.form.get("preview_dirty") == "1"
             or preview.get("token") != preview_token
             or preview.get("dataset") != dataset_session.dataset_fingerprint()
-            or cleaning_service.operation_plan_token(preview.get("operations", [])) != preview_token
+            or cleaning_operations.operation_plan_token(preview.get("operations", [])) != preview_token
         ):
             flash(
-                "The preview is out of date — the dataset or the operations changed. "
+                "The preview is out of date â€” the dataset or the operations changed. "
                 "Preview again before applying.",
                 "error",
             )
@@ -69,7 +75,7 @@ def clean_dataset():
         flash("No cleaning operations were selected. Choose at least one option.", "error")
         return redirect(url_for("dataset.dataset_analysis"))
 
-    plan_errors = cleaning_service.validate_plan(df, operations)
+    plan_errors = cleaning_operations.validate_plan(df, operations)
     if plan_errors:
         for error in plan_errors:
             flash(error, "error")
@@ -111,13 +117,13 @@ def _compute_cleaning(
     """Run a validated plan and write its result file without changing session state."""
     before = _snapshot_stats(df)
     converted = dict(overrides)
-    cleaned_df, step_history = cleaning_service.apply_cleaning_operations(
+    cleaned_df, step_history = cleaning_operations.apply_cleaning_operations(
         df, operations, converted_types=converted
     )
     after = _snapshot_stats(cleaned_df)
     # Lossless pickle keeps Int64/boolean/datetime types for later passes;
     # the downloads re-export CSV/Excel straight from this dataset.
-    output_path = file_service.export_dataset(
+    output_path = dataset_exporter.export_dataset(
         cleaned_df, original_name, file_format="pickle", namespace=namespace
     )
     return {
@@ -145,7 +151,7 @@ def _pending_mapping_columns(df, cleaned_df, operations, pending_category_column
     pending = set(pending_category_columns or ())
     mapped_columns = {op.get("column") for op in operations if op.get("type") == "categories"}
     pending -= mapped_columns
-    before_text_findings = analysis_service.detect_inconsistent_text(df)
+    before_text_findings = analysis_tools.detect_inconsistent_text(df)
     for op in operations:
         column = op.get("column")
         if (
@@ -215,7 +221,7 @@ def cleaning_result():
         flash("No cleaning result found. Please upload and clean a dataset first.", "error")
         return redirect(url_for("upload.index"))
 
-    df = file_service.load_dataset(processed_path)
+    df = dataset_importer.load_dataset(processed_path)
     if df is None:
         flash("The cleaned dataset could not be opened. Please clean the dataset again.", "error")
         return redirect(url_for("upload.index"))
@@ -261,14 +267,14 @@ def download_dataset():
     base_name = dataset_session.original_filename
     stem = base_name.rsplit(".", 1)[0]
 
-    df = file_service.load_dataset(processed)
+    df = dataset_importer.load_dataset(processed)
     if df is None:
         abort(404)
 
     if file_format == "csv":
         try:
             params = dataset_session.upload_load_params
-            csv_path = file_service.export_dataset(
+            csv_path = dataset_exporter.export_dataset(
                 df,
                 stem,
                 file_format="csv",
@@ -283,7 +289,7 @@ def download_dataset():
         return send_file(csv_path, as_attachment=True, download_name=f"{stem}_cleaned.csv")
     df = dataset_session.apply_column_types(df)
     try:
-        excel_path = file_service.export_dataset(
+        excel_path = dataset_exporter.export_dataset(
             df,
             stem,
             file_format="excel",
@@ -315,8 +321,8 @@ def download_audit():
                 "operations": entry.get("operations", []),
             })
     payload = {
-        "format": cleaning_service.RECIPE_FORMAT,
-        "version": cleaning_service.RECIPE_VERSION,
+        "format": cleaning_operations.RECIPE_FORMAT,
+        "version": cleaning_operations.RECIPE_VERSION,
         "original_filename": dataset_session.original_filename,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "recipe": recipe,
@@ -361,13 +367,13 @@ def inspect_recipe():
         if len(raw) > Config.MAX_RECIPE_BYTES:
             raise ValueError("Recipe files must be 1 MB or smaller.")
         payload = json.loads(raw.decode("utf-8-sig"))
-        recipe = cleaning_service.normalize_recipe_payload(
+        recipe = cleaning_operations.normalize_recipe_payload(
             payload,
             max_runs=Config.MAX_RECIPE_RUNS,
             max_operations=Config.MAX_RECIPE_OPERATIONS,
         )
-        df = file_service.load_dataset(
-            dataset_session.working_path, **dataset_session.upload_load_params
+        df = dataset_importer.load_dataset(
+            dataset_session.working_path, **dataset_session.working_load_params
         )
         if df is None:
             raise ValueError("The current dataset is no longer available.")
@@ -375,10 +381,10 @@ def inspect_recipe():
         limit_error = dataset_limit_error(df)
         if limit_error:
             raise ValueError(limit_error)
-        _, report, _, _ = cleaning_service.inspect_recipe(
+        _, report, _, _ = cleaning_operations.inspect_recipe(
             df, recipe, converted_types=dataset_session.column_type_overrides
         )
-        token = cleaning_service.operation_plan_token(recipe)
+        token = cleaning_operations.operation_plan_token(recipe)
         session["recipe_preview"] = {
             "token": token,
             "dataset": dataset_session.dataset_fingerprint(),
@@ -403,19 +409,19 @@ def apply_recipe():
         or preview.get("token") != token
         or preview.get("dataset") != dataset_session.dataset_fingerprint()
         or not isinstance(recipe, list)
-        or cleaning_service.operation_plan_token(recipe) != token
+        or cleaning_operations.operation_plan_token(recipe) != token
     ):
         flash("The recipe review is out of date. Check the recipe again.", "error")
         return redirect(url_for("dataset.dataset_analysis"))
 
     try:
-        df = file_service.load_dataset(
-            dataset_session.working_path, **dataset_session.upload_load_params
+        df = dataset_importer.load_dataset(
+            dataset_session.working_path, **dataset_session.working_load_params
         )
         if df is None:
             raise ValueError("The current dataset is no longer available.")
         df = dataset_session.apply_column_types(df)
-        cleaned, _, converted, history = cleaning_service.inspect_recipe(
+        cleaned, _, converted, history = cleaning_operations.inspect_recipe(
             df, recipe, converted_types=dataset_session.column_type_overrides
         )
         clean_operations = [
@@ -430,7 +436,7 @@ def apply_recipe():
             clean_operations,
             list(session.get("pending_category_columns", [])),
         ))
-        output_path = file_service.export_dataset(
+        output_path = dataset_exporter.export_dataset(
             cleaned,
             dataset_session.original_filename,
             file_format="pickle",
@@ -500,7 +506,7 @@ def _parse_operations(df: pd.DataFrame) -> list[dict]:
     # Date cleaning from date issue cards
     global_dayfirst = bool(form.get("date_dayfirst"))
     global_date_format = form.get("date_format", "")
-    if global_date_format not in cleaning_service.DATE_FORMATS:
+    if global_date_format not in cleaning_operations.DATE_FORMATS:
         global_date_format = ""
     timezone_policy = "utc" if form.get("date_utc") else "preserve"
     for key, column in form.items():

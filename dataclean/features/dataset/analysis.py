@@ -10,7 +10,7 @@ import re
 import pandas as pd
 from config import Config
 
-from services.cleaning_service import missing_mask
+from features.cleaning.operations import missing_mask
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

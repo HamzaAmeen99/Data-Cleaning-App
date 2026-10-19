@@ -1,4 +1,4 @@
-"""Comprehensive unit and integration tests verifying all functional inconsistency fixes."""
+﻿"""Comprehensive unit and integration tests verifying all functional inconsistency fixes."""
 
 import io
 import json
@@ -15,7 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import create_app
 from config import Config
-from services import analysis_service, cleaning_service, file_service
+from features.cleaning import operations as cleaning_service
+from features.dataset import analysis as analysis_service
+from features.upload import dataset_importer
+from workspace import dataset_exporter, file_store
 from utils.validators import dataset_limit_error
 
 app = create_app()
@@ -283,7 +286,7 @@ check(
 # --------------------------------------------------------------------------
 # 6d. Import/export fidelity: leading-zero IDs, oversized integers,
 #     type-preserving round trips, CSV/Excel controls.
-#     (Uses the Flask app only for the config context file_service expects.)
+#     (Uses the Flask app only for the config context dataset exporters expect.)
 # --------------------------------------------------------------------------
 app4 = create_app()
 app4.config["TESTING"] = True
@@ -297,7 +300,8 @@ csv_bytes = (
 semi_bytes = "Vornamen;Sta_dtte\nJ\u00fcrgen;K\u00f6ln\n".encode("latin1")
 
 with app4.app_context():
-    from services import file_service as fs4
+    from features.upload import dataset_importer as importer4
+    from workspace import dataset_exporter as exporter4
 
     workdir = app4.config["PROCESSED_FOLDER"]
     workdir.mkdir(parents=True, exist_ok=True)
@@ -305,7 +309,7 @@ with app4.app_context():
     csv_path = workdir / f"phase4_ids_{phase4_token}.csv"
     csv_path.write_bytes(csv_bytes)
 
-    df_ids = fs4.load_dataset(csv_path, delimiter=",")
+    df_ids = importer4.load_dataset(csv_path, delimiter=",")
     check(
         "leading-zero identifier preserved as text",
         df_ids["ID"].iloc[0] == "00123",
@@ -313,7 +317,7 @@ with app4.app_context():
     )
     id_token_path = workdir / f"phase4_id_token_{phase4_token}.csv"
     id_token_path.write_text("ID\n00123\nN/A\n00456\n", encoding="utf-8")
-    df_id_token = fs4.load_dataset(id_token_path, delimiter=",")
+    df_id_token = importer4.load_dataset(id_token_path, delimiter=",")
     check(
         "leading-zero identifier survives a missing token in the same column",
         df_id_token["ID"].tolist() == ["00123", pd.NA, "00456"],
@@ -327,7 +331,7 @@ with app4.app_context():
 
     semi_path = workdir / f"phase4_semi_{phase4_token}.csv"
     semi_path.write_bytes(semi_bytes)
-    df_latin = fs4.load_dataset(semi_path, delimiter=";", encoding="latin1")
+    df_latin = importer4.load_dataset(semi_path, delimiter=";", encoding="latin1")
     check(
         "latin1 encoding and semicolon delimiter honored",
         df_latin is not None
@@ -335,7 +339,7 @@ with app4.app_context():
         and df_latin["Sta_dtte"].iloc[0] == "K\u00f6ln",
         f"cols={list(df_latin.columns) if df_latin is not None else None}",
     )
-    df_latin_auto = fs4.load_dataset(semi_path, delimiter=";")
+    df_latin_auto = importer4.load_dataset(semi_path, delimiter=";")
     check(
         "automatic latin1 fallback is used for both inferred and raw reads",
         df_latin_auto is not None and df_latin_auto["Sta_dtte"].iloc[0] == "K\u00f6ln",
@@ -348,8 +352,8 @@ with app4.app_context():
         "flag": pd.array([True, False], dtype="boolean"),
         "day": pd.to_datetime(["2024-01-01", None]),
     })
-    pkl_path = fs4.export_dataset(typed_df, "phase4_roundtrip", file_format="pickle")
-    back = fs4.load_dataset(pkl_path)
+    pkl_path = exporter4.export_dataset(typed_df, "phase4_roundtrip", file_format="pickle")
+    back = importer4.load_dataset(pkl_path)
     check(
         "pickle intermediate preserves dtypes",
         back is not None
@@ -362,7 +366,7 @@ with app4.app_context():
     pkl_path.unlink()
 
     # CSV/Excel exports generated directly from the current dataset
-    csv_out = fs4.export_dataset(typed_df, "phase4_export", file_format="csv", delimiter=";")
+    csv_out = exporter4.export_dataset(typed_df, "phase4_export", file_format="csv", delimiter=";")
     csv_text = csv_out.read_bytes().decode("utf-8")
     check(
         "csv export keeps leading zeros and exact big values",
@@ -371,15 +375,15 @@ with app4.app_context():
     )
     csv_out.unlink()
 
-    xlsx_out = fs4.export_dataset(typed_df, "phase4_export", file_format="excel")
-    df_back = fs4.load_dataset(xlsx_out, sheet="Data")
+    xlsx_out = exporter4.export_dataset(typed_df, "phase4_export", file_format="excel")
+    df_back = importer4.load_dataset(xlsx_out, sheet="Data")
     check(
         "excel export round trips values and accepts sheet selection",
         df_back is not None and df_back["count"].iloc[0] == 5,
     )
     check(
         "missing excel sheet surfaces workbook names (error path)",
-        fs4.load_dataset(xlsx_out, sheet="Nope") is None,
+        importer4.load_dataset(xlsx_out, sheet="Nope") is None,
     )
     xlsx_out.unlink()
 
@@ -388,7 +392,7 @@ with app4.app_context():
     semi_path.unlink()
 
 # --------------------------------------------------------------------------
-# 6e. Phase 5 — predictable dates and numbers.
+# 6e. Phase 5 â€” predictable dates and numbers.
 # --------------------------------------------------------------------------
 df_dates = pd.DataFrame({"when": ["01/02/2024", "not-a-date"]})
 df_month, _ = cleaning_service.convert_column_type(
@@ -494,7 +498,7 @@ check(
 )
 
 # --------------------------------------------------------------------------
-# 6f. Phase 6 — validated cleaning plans.
+# 6f. Phase 6 â€” validated cleaning plans.
 # --------------------------------------------------------------------------
 df_plan = pd.DataFrame({"a": [1, 2], "b": ["x ", "y"]})
 
@@ -575,7 +579,7 @@ with app.test_client() as client:
     check("empty rename target rejected", b"cannot be empty" in res_empty.data, "no flash seen")
 
 # --------------------------------------------------------------------------
-# 6g. Phase 7 — preview before applying.
+# 6g. Phase 7 â€” preview before applying.
 # --------------------------------------------------------------------------
 df_prev = pd.DataFrame({"v": ["a", "b", None, "a"]})
 preview_ops = [
@@ -684,7 +688,7 @@ with app.test_client() as client:
     )
 
 # --------------------------------------------------------------------------
-# 12. Phase 8 — undo & reproducible history.
+# 12. Phase 8 â€” undo & reproducible history.
 # --------------------------------------------------------------------------
 df_rep = pd.DataFrame({"a": [" x ", "y ", "  x  "], "c": [1, None, 3]})
 recipe = [
@@ -814,6 +818,8 @@ with app.test_client() as client:
 
     with open(messy_csv, "rb") as fh:
         client.post("/upload", data={"file": (fh, "sample_messy_data.csv"), "csrf_token": csrf})
+    with client.session_transaction() as sess:
+        reset_baseline = Path(sess["baseline_path"])
 
     # Pass 1: Trim whitespace & deduplicate
     res1 = client.post("/clean", data={"op_duplicates": "1", "op_trim": "1", "csrf_token": csrf}, follow_redirects=True)
@@ -852,6 +858,11 @@ with app.test_client() as client:
     )
     # Overview after reset should have the original 20 rows
     check("reset restored original 20 rows", b"20" in res_reset.data)
+    with client.session_transaction() as sess:
+        check(
+            "reset restores the lossless baseline snapshot",
+            sess.get("current_path") == str(reset_baseline) and reset_baseline.exists(),
+        )
 
 # --------------------------------------------------------------------------
 # 8. Explorer datatype selection persists into Cleaning
@@ -930,7 +941,10 @@ with app.test_client() as client:
     with client.session_transaction() as sess:
         session_paths = {
             Path(path)
-            for key in ("upload_path", "current_path", "processed_path", "excel_path")
+            for key in (
+                "upload_path", "baseline_path", "current_path", "processed_path",
+                "excel_path",
+            )
             if (path := sess.get(key))
         }
     check("session files exist before ending", session_paths and all(path.exists() for path in session_paths))
@@ -959,14 +973,18 @@ with app.test_client() as client:
             content_type="multipart/form-data",
         )
     with client.session_transaction() as sess:
-        beacon_upload = Path(sess["upload_path"])
+        beacon_paths = {
+            Path(sess["upload_path"]),
+            Path(sess["baseline_path"]),
+        }
     beacon_response = client.post(
         "/session/end",
         data={"csrf_token": beacon_csrf, "beacon": "1"},
     )
     check(
         "tab-close beacon ends session",
-        beacon_response.status_code == 204 and not beacon_upload.exists(),
+        beacon_response.status_code == 204
+        and all(not path.exists() for path in beacon_paths),
     )
 
 # --------------------------------------------------------------------------
@@ -986,6 +1004,57 @@ with app.test_client() as client:
     # Verify no unparseable_test.csv lingers in uploads
     broken_exists = (app.config["UPLOAD_FOLDER"] / "unparseable_test.csv").exists()
     check("failed upload unlinks file from disk", not broken_exists)
+
+with app.test_client() as client:
+    client.get("/upload")
+    with client.session_transaction() as sess:
+        snapshot_csrf = sess.get("csrf_token", "test-token")
+    client.post(
+        "/upload",
+        data={
+            "file": (io.BytesIO(b"id,value\n1,kept\n"), "snapshot_kept.csv"),
+            "csrf_token": snapshot_csrf,
+        },
+        content_type="multipart/form-data",
+    )
+    with client.session_transaction() as sess:
+        workspace_before_failure = sess.get("current_path")
+        owned_before_failure = {
+            Path(path) for path in sess.get("owned_paths", [])
+        }
+
+    failed_snapshot_name = f"snapshot_failure_{uuid4().hex}.csv"
+    real_export = dataset_exporter.export_dataset
+
+    def fail_snapshot(*args, **kwargs):
+        raise OSError("simulated snapshot failure")
+
+    dataset_exporter.export_dataset = fail_snapshot
+    try:
+        failed_snapshot_response = client.post(
+            "/upload",
+            data={
+                "file": (io.BytesIO(b"id,value\n2,rejected\n"), failed_snapshot_name),
+                "csrf_token": snapshot_csrf,
+            },
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+    finally:
+        dataset_exporter.export_dataset = real_export
+
+    with client.session_transaction() as sess:
+        check(
+            "snapshot failure keeps the active workspace",
+            b"prepare this dataset" in failed_snapshot_response.data
+            and sess.get("current_path") == workspace_before_failure
+            and all(path.exists() for path in owned_before_failure),
+        )
+    check(
+        "snapshot failure removes the rejected source",
+        not (app.config["UPLOAD_FOLDER"] / failed_snapshot_name).exists(),
+    )
+    client.post("/session/end", data={"csrf_token": snapshot_csrf})
 
 # --------------------------------------------------------------------------
 # 11. Route-level: dedup_mode and dedup_columns form fields are honored.
@@ -1064,6 +1133,16 @@ with app.test_client() as client:
     )
     with client.session_transaction() as sess:
         first_upload = Path(sess["upload_path"])
+        first_baseline = Path(sess["baseline_path"])
+        check(
+            "accepted upload starts from a lossless baseline snapshot",
+            first_upload.suffix == ".csv"
+            and first_baseline.suffix == ".pkl"
+            and first_upload.exists()
+            and first_baseline.exists()
+            and sess.get("current_path") == str(first_baseline)
+            and "processed_path" not in sess,
+        )
     rejected = client.post(
         "/clean",
         data={
@@ -1079,7 +1158,7 @@ with app.test_client() as client:
         check(
             "route leaves dataset untouched when plan validation fails",
             b"dataset was not changed" in rejected.data
-            and sess.get("current_path") == str(first_upload)
+            and sess.get("current_path") == str(first_baseline)
             and not sess.get("history_stack"),
         )
 
@@ -1102,9 +1181,13 @@ with app.test_client() as client:
     )
     with client.session_transaction() as sess:
         second_upload = Path(sess["upload_path"])
+        second_baseline = Path(sess["baseline_path"])
         check(
             "new upload starts a clean workflow state",
             second_upload.exists()
+            and second_baseline.exists()
+            and second_baseline.suffix == ".pkl"
+            and sess.get("current_path") == str(second_baseline)
             and not sess.get("history_stack")
             and not sess.get("audit_log")
             and "before_stats" not in sess
@@ -1171,7 +1254,8 @@ with app.test_client() as client:
     client.post("/clean", data={"op_duplicates": "1", "csrf_token": version_csrf})
     with client.session_transaction() as sess:
         version_paths = [Path(entry["file"]) for entry in sess["history_stack"]]
-        original_for_undo = Path(sess["upload_path"])
+        source_for_undo = Path(sess["upload_path"])
+        baseline_for_undo = Path(sess["baseline_path"])
     client.post("/dataset/undo", data={"csrf_token": version_csrf})
     check(
         "undo immediately deletes the discarded version file",
@@ -1179,9 +1263,16 @@ with app.test_client() as client:
     )
     client.post("/dataset/undo", data={"csrf_token": version_csrf})
     check(
-        "undoing the first run deletes its version and restores the upload",
-        not version_paths[0].exists() and original_for_undo.exists(),
+        "undoing the first run restores the baseline snapshot",
+        not version_paths[0].exists()
+        and source_for_undo.exists()
+        and baseline_for_undo.exists(),
     )
+    with client.session_transaction() as sess:
+        check(
+            "first undo points at the baseline snapshot",
+            sess.get("current_path") == str(baseline_for_undo),
+        )
     check("reset endpoint rejects destructive GET", client.get("/dataset/reset").status_code == 405)
     client.post("/session/end", data={"csrf_token": version_csrf})
 
@@ -1196,7 +1287,7 @@ with app.test_client() as client:
         content_type="multipart/form-data",
     )
     with client.session_transaction() as sess:
-        original_recipe_df = file_service.load_dataset(Path(sess["upload_path"]), delimiter="auto")
+        original_recipe_df = dataset_importer.load_dataset(Path(sess["upload_path"]), delimiter="auto")
     client.post(
         "/dataset/select-columns",
         data={
@@ -1213,7 +1304,7 @@ with app.test_client() as client:
         ]
         selected_path = Path(sess["current_path"])
     replayed_selection = cleaning_service.replay_recipe(original_recipe_df, recipe_payload)
-    selected_df = file_service.load_dataset(selected_path)
+    selected_df = dataset_importer.load_dataset(selected_path)
     check(
         "column selection recipe reproduces selection, rename and datatype",
         list(replayed_selection.columns) == ["code", "score"]
@@ -1345,7 +1436,7 @@ with app.test_client() as client:
         },
     )
     with client.session_transaction() as sess:
-        mapped_category_df = file_service.load_dataset(Path(sess["current_path"]))
+        mapped_category_df = dataset_importer.load_dataset(Path(sess["current_path"]))
         check(
             "an explicit category mapping clears the pending review marker",
             "pending_category_columns" not in sess,
@@ -1365,7 +1456,7 @@ with app.test_client() as client:
     client.post("/session/end", data={"csrf_token": category_csrf})
 
 # --------------------------------------------------------------------------
-# 15. Phase 9 — broader analysis findings (counts + examples, read-only).
+# 15. Phase 9 â€” broader analysis findings (counts + examples, read-only).
 # --------------------------------------------------------------------------
 df_mixed = pd.DataFrame({"score": ["10", "12", "not-a-number", "15"]})
 mixed = analysis_service.detect_mixed_types(df_mixed)
@@ -1435,7 +1526,7 @@ check(
 )
 
 # --------------------------------------------------------------------------
-# 16. Phase 9 — new transformations (validation, preview and undo are generic).
+# 16. Phase 9 â€” new transformations (validation, preview and undo are generic).
 # --------------------------------------------------------------------------
 df_norm = pd.DataFrame({"note": ["a\u00a0\u00a0b", "  c  ", "d"]})
 norm_df, norm_count = cleaning_service.normalize_text(df_norm)
@@ -1638,7 +1729,7 @@ with app.test_client() as client:
         "expected history lines missing",
     )
     with client.session_transaction() as sess:
-        applied_df = file_service.load_dataset(Path(sess["current_path"]))
+        applied_df = dataset_importer.load_dataset(Path(sess["current_path"]))
     check(
         "applied result has the split and merged columns",
         list(applied_df.columns) == ["name", "region", "amount", "code_left", "code_right", "who"]
@@ -1647,7 +1738,7 @@ with app.test_client() as client:
     )
     client.post("/dataset/undo", data={"csrf_token": tools_csrf}, follow_redirects=True)
     with client.session_transaction() as sess:
-        undone_df = file_service.load_dataset(Path(sess["current_path"]))
+        undone_df = dataset_importer.load_dataset(Path(sess["current_path"]))
     check(
         "undo reverses the new operations",
         "code" in undone_df.columns and "who" not in undone_df.columns,
@@ -1656,7 +1747,7 @@ with app.test_client() as client:
     client.post("/session/end", data={"csrf_token": tools_csrf})
 
 # --------------------------------------------------------------------------
-# 16b. Phase 9 — user-defined validation rules and their actions.
+# 16b. Phase 9 â€” user-defined validation rules and their actions.
 # --------------------------------------------------------------------------
 df_rules = pd.DataFrame({
     "status": ["ok", "bad", "ok", "ok", "ok"],
@@ -1744,7 +1835,7 @@ check(
 )
 
 # --------------------------------------------------------------------------
-# 17. Phase 10 — configurable limits and actionable parsing errors.
+# 17. Phase 10 â€” configurable limits and actionable parsing errors.
 # --------------------------------------------------------------------------
 check(
     "row limit produces an actionable message",
@@ -1816,7 +1907,7 @@ with app.test_client() as client:
 
 ragged_path = Path(app.config["PROCESSED_FOLDER"]) / "phase10_ragged.csv"
 ragged_path.write_bytes(broken_csv)
-parsed, reason = file_service.load_dataset_with_error(ragged_path, delimiter=",")
+parsed, reason = dataset_importer.load_dataset_with_error(ragged_path, delimiter=",")
 check(
     "parser errors become an actionable sentence",
     parsed is None and "line up as CSV" in reason,
@@ -1824,7 +1915,7 @@ check(
 )
 check(
     "load_dataset still returns None quietly for bad files",
-    file_service.load_dataset(ragged_path, delimiter=",") is None,
+    dataset_importer.load_dataset(ragged_path, delimiter=",") is None,
 )
 ragged_path.unlink()
 
@@ -2023,7 +2114,7 @@ with app.test_client() as client:
     )
     check("reviewed recipe applies as one result", b"Applied 2 reviewed recipe run(s)" in applied.data)
     with client.session_transaction() as sess:
-        recipe_df = file_service.load_dataset(Path(sess["current_path"]))
+        recipe_df = dataset_importer.load_dataset(Path(sess["current_path"]))
         recipe_entry = sess["history_stack"][-1]
     check(
         "recipe application stores one undoable imported-recipe event",
@@ -2036,7 +2127,7 @@ with app.test_client() as client:
     check("imported recipe remains replayable in the audit export", audit["recipe"] == normalized_recipe)
     client.post("/dataset/undo", data={"csrf_token": recipe_csrf})
     with client.session_transaction() as sess:
-        undone_recipe_df = file_service.load_dataset(Path(sess["current_path"]), delimiter="auto")
+        undone_recipe_df = dataset_importer.load_dataset(Path(sess["current_path"]), delimiter="auto")
     check("one undo reverses the entire imported recipe", list(undone_recipe_df.columns) == ["name", "score", "extra"])
 
     client.post(
@@ -2063,7 +2154,7 @@ with app.test_client() as client:
     client.post("/session/end", data={"csrf_token": recipe_csrf})
 
 # --------------------------------------------------------------------------
-# 20. Phase 10 — session file expiry and isolated output paths.
+# 20. Phase 10 â€” session file expiry and isolated output paths.
 # --------------------------------------------------------------------------
 with app.app_context():
     processed_root = Path(app.config["PROCESSED_FOLDER"])
@@ -2072,7 +2163,7 @@ with app.app_context():
     os.utime(stale_file, (time.time() - 600, time.time() - 600))
     fresh_file = processed_root / "phase10_fresh.csv"
     fresh_file.write_text("y", encoding="utf-8")
-    removed = file_service.sweep_stale_files(60)
+    removed = file_store.sweep_stale_files(60)
     check(
         "abandoned files are expired, fresh ones kept",
         removed >= 1 and not stale_file.exists() and fresh_file.exists(),
@@ -2080,7 +2171,7 @@ with app.app_context():
     )
     check(
         "a long TTL keeps files",
-        file_service.sweep_stale_files(10 ** 9) == 0 and fresh_file.exists(),
+        file_store.sweep_stale_files(10 ** 9) == 0 and fresh_file.exists(),
     )
     fresh_file.unlink()
 
