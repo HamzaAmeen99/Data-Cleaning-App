@@ -1,10 +1,13 @@
-"""Read user-provided datasets without losing identifier values."""
+"""Read user-provided datasets with bounded shape checks."""
 
+import csv
 import re
 from decimal import Decimal
 from pathlib import Path
 
 import pandas as pd
+from config import Config
+from utils.validators import DatasetLimitExceeded, dataset_limit_error_from_shape
 
 _INT_RE = re.compile(r"[+-]?\d+\Z")
 
@@ -22,6 +25,8 @@ def describe_parse_error(error: Exception) -> str:
     """Turn a parser exception into one actionable sentence for the user."""
     name = type(error).__name__
     text = str(error).strip().splitlines()[0] if str(error).strip() else ""
+    if isinstance(error, DatasetLimitExceeded):
+        return str(error)
     if isinstance(error, UnicodeDecodeError):
         return (
             "This file is not valid UTF-8 text. Choose the Latin-1 (Western) "
@@ -92,6 +97,11 @@ def _read_dataset(
         else:
             kwargs["sep"] = None
             kwargs["engine"] = "python"
+        effective_encoding = _preflight_csv_limits(
+            filepath, encoding=encoding, delimiter=delimiter
+        )
+        if effective_encoding and not encoding:
+            kwargs["encoding"] = effective_encoding
         try:
             df = pd.read_csv(filepath, **kwargs)
         except UnicodeDecodeError:
@@ -100,16 +110,110 @@ def _read_dataset(
             fallback = {key: value for key, value in kwargs.items() if key != "encoding"}
             df = pd.read_csv(filepath, encoding="latin1", **fallback)
             kwargs["encoding"] = "latin1"
+        repair_columns = [
+            column for column in df.columns
+            if pd.api.types.is_numeric_dtype(df[column])
+        ]
+        if not repair_columns:
+            return df
         raw_kwargs = dict(kwargs)
-        raw_kwargs.update(dtype=str, keep_default_na=False)
+        raw_kwargs.update(
+            dtype=str,
+            keep_default_na=False,
+            usecols=repair_columns,
+        )
         df_raw = pd.read_csv(filepath, **raw_kwargs)
         _repair_typed_columns(df, df_raw)
         return df
     if suffix in (".xls", ".xlsx"):
+        _preflight_excel_limits(filepath, sheet=sheet)
         if sheet:
             return pd.read_excel(filepath, sheet_name=sheet)
         return pd.read_excel(filepath)
     raise ValueError(f"Unsupported file type '{suffix}'.")
+
+
+def _preflight_csv_limits(
+    filepath: Path,
+    *,
+    encoding: str | None,
+    delimiter: str | None,
+) -> str | None:
+    """Count CSV records without materializing them into a DataFrame."""
+    encodings = [encoding] if encoding else ["utf-8", "latin1"]
+    for candidate_encoding in encodings:
+        try:
+            with filepath.open("r", encoding=candidate_encoding, newline="") as handle:
+                sample = handle.read(8192)
+                handle.seek(0)
+                csv_delimiter = delimiter if delimiter and delimiter != "auto" else None
+                if not csv_delimiter:
+                    try:
+                        csv_delimiter = csv.Sniffer().sniff(
+                            sample, delimiters=",;\t"
+                        ).delimiter
+                    except csv.Error:
+                        csv_delimiter = ","
+                reader = csv.reader(handle, delimiter=csv_delimiter)
+                header = next(reader, None)
+                if header is None:
+                    return candidate_encoding
+                columns = len(header)
+                _raise_if_over_limit(0, columns)
+                rows = 0
+                for row in reader:
+                    if not row or all(not value.strip() for value in row):
+                        continue
+                    rows += 1
+                    _raise_if_over_limit(rows, columns)
+                return candidate_encoding
+        except UnicodeDecodeError:
+            if encoding:
+                raise
+    return encoding
+
+
+def _preflight_excel_limits(filepath: Path, *, sheet: str | None) -> None:
+    """Inspect workbook dimensions before pandas materializes the dataset."""
+    if filepath.suffix.lower() == ".xlsx":
+        try:
+            from openpyxl import load_workbook
+
+            workbook = load_workbook(filepath, read_only=True, data_only=True)
+            try:
+                if sheet:
+                    if sheet not in workbook.sheetnames:
+                        raise ValueError(f"Worksheet '{sheet}' not found.")
+                    worksheet = workbook[sheet]
+                else:
+                    worksheet = workbook.active
+                columns = int(worksheet.max_column or 0)
+                rows = max(int(worksheet.max_row or 0) - 1, 0)
+                _raise_if_over_limit(rows, columns)
+            finally:
+                workbook.close()
+            return
+        except ImportError:
+            pass
+
+    probe = pd.read_excel(filepath, sheet_name=sheet, nrows=1)
+    columns = int(probe.shape[1])
+    _raise_if_over_limit(0, columns)
+    if columns <= 0:
+        return
+    sample_rows = min(
+        Config.MAX_ROWS + 1,
+        (Config.MAX_CELLS // columns) + 1,
+    )
+    sample = pd.read_excel(filepath, sheet_name=sheet, nrows=sample_rows)
+    _raise_if_over_limit(len(sample), columns)
+
+
+def _raise_if_over_limit(rows: int, columns: int) -> None:
+    """Raise as soon as a bounded read proves a configured limit is exceeded."""
+    message = dataset_limit_error_from_shape(rows, columns)
+    if message:
+        raise DatasetLimitExceeded(message)
 
 
 def _repair_typed_columns(df: pd.DataFrame, df_raw: pd.DataFrame) -> None:

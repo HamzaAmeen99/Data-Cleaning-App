@@ -74,7 +74,6 @@ def process_upload(file, encoding: str, delimiter: str, sheet: str) -> tuple[boo
         delimiter=delimiter,
         sheet=sheet,
     )
-    file_store.delete_file(filepath)
     return True, "Dataset uploaded successfully."
 
 
