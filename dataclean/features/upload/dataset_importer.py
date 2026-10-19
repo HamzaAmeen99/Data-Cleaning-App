@@ -187,9 +187,23 @@ def _preflight_excel_limits(filepath: Path, *, sheet: str | None) -> None:
                     worksheet = workbook[sheet]
                 else:
                     worksheet = workbook.active
-                columns = int(worksheet.max_column or 0)
-                rows = max(int(worksheet.max_row or 0) - 1, 0)
-                _raise_if_over_limit(rows, columns)
+                # Ignore the worksheet's advertised dimensions. A crafted
+                # workbook can under-report them, so stream actual rows from
+                # the XML and stop as soon as a limit is proven.
+                worksheet.reset_dimensions()
+                rows = worksheet.iter_rows(min_row=1, values_only=True)
+                header = next(rows, None)
+                if header is None:
+                    return
+                columns = len(header)
+                _raise_if_over_limit(0, columns)
+                data_rows = 0
+                for row in rows:
+                    if not row or all(value in (None, "") for value in row):
+                        continue
+                    columns = max(columns, len(row))
+                    data_rows += 1
+                    _raise_if_over_limit(data_rows, columns)
             finally:
                 workbook.close()
             return
