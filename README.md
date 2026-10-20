@@ -111,6 +111,40 @@ that prefix), so its version validation and cache headers run. The existing
 `/static/` mapping can remain. Re-run PageSpeed against the deployed page after
 reloading; a saved report does not update when code changes.
 
+Before importing `app` in the PythonAnywhere WSGI configuration, provide the
+production environment and a stable, private random secret:
+
+```python
+import os
+
+os.environ["DATACLEAN_ENV"] = "production"
+os.environ["DATACLEAN_SECRET_KEY"] = "your-random-secret-of-at-least-32-bytes"
+```
+
+Keep the real secret outside Git. DataClean deliberately refuses to start in
+production when `DATACLEAN_SECRET_KEY` is missing or shorter than 32 bytes.
+Development remains the default environment; `DATACLEAN_ENV` also accepts
+`testing` for isolated tests. Production must be served over HTTPS because its
+host-only session cookie is deliberately marked `Secure`.
+
+Workspace sessions and their private files expire after 24 hours. Ordinary GET
+requests do not extend that deadline automatically; users whose workspace is no
+longer available are returned to upload with a recovery message. Visiting the
+public landing page does not create a session; one begins when the visitor opens
+the upload workspace. After an upload is accepted, DataClean replaces both the
+session identifier and CSRF token before showing the dataset workspace.
+Reloading an active workspace asks whether to end it; confirmation deletes its
+files and returns to Upload. Switching browser tabs does not affect the session.
+Session records use CacheLib's private filesystem cache rather than Flask-Session's
+deprecated filesystem backend.
+Every state-changing application route is covered by one central CSRF guard, so
+new mutation endpoints are protected without route-specific validation calls.
+All responses prevent framing and MIME sniffing, limit referrer disclosure, and
+restrict forms to this origin. Production responses also enable one-year HSTS.
+Workspace pages, redirects and generated downloads send `no-store, private`
+cache headers so browsers do not retain dataset content. Public versioned assets
+remain cacheable for one year.
+
 ## Supported file formats
 
 | Format | Extension | Notes |

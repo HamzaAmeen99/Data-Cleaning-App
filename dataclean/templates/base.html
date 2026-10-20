@@ -27,6 +27,7 @@
 <body class="{% if request.endpoint == 'upload.index' %}public-page{% else %}workspace-page{% endif %}"
   data-session-active="{{ 'true' if session.get('original_filename') else 'false' }}"
   data-end-session-url="{{ url_for('upload.end_session') }}"
+  data-upload-url="{{ url_for('upload.upload_page') }}"
   data-csrf-token="{{ csrf_token }}">
   {% set is_landing = request.endpoint == 'upload.index' %}
 

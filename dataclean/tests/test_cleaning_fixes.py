@@ -1,4 +1,4 @@
-﻿"""Comprehensive unit and integration tests verifying all functional inconsistency fixes."""
+"""Comprehensive unit and integration tests verifying all functional inconsistency fixes."""
 
 import io
 import json
@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import numpy as np
 import pandas as pd
+from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -33,6 +34,12 @@ def check(name, condition, extra=""):
     if not condition:
         failures.append(name)
     print(f"[{status}] {name}" + (f" -> {extra}" if extra and not condition else ""))
+
+
+def current_csrf(client) -> str:
+    """Read the token a freshly rendered form would submit."""
+    with client.session_transaction() as active_session:
+        return active_session.get("csrf_token", "test-token")
 
 
 # --------------------------------------------------------------------------
@@ -387,6 +394,76 @@ with app4.app_context():
     )
     xlsx_out.unlink()
 
+    # Spreadsheet downloads neutralize formulas without changing workspace data.
+    formula_values = [
+        "=2+2",
+        "+cmd",
+        "-cmd",
+        "@SUM(A1:A2)",
+        "  =1+1",
+        "\t=1+1",
+        "\r=1+1",
+        "\n=1+1",
+        "'=already safe",
+        "ordinary text",
+    ]
+    formula_df = pd.DataFrame({"=Formula heading": formula_values, "number": [-42] * 10})
+    original_formula_df = formula_df.copy(deep=True)
+    expected_safe_values = [
+        "'=2+2",
+        "'+cmd",
+        "'-cmd",
+        "'@SUM(A1:A2)",
+        "'  =1+1",
+        "'\t=1+1",
+        "'\r=1+1",
+        "'\n=1+1",
+        "'=already safe",
+        "ordinary text",
+    ]
+
+    safe_csv = exporter4.export_dataset(formula_df, "formula_safe", file_format="csv")
+    csv_back = pd.read_csv(safe_csv, dtype=str, keep_default_na=False)
+    check(
+        "CSV export neutralizes formula cells and headings",
+        list(csv_back.columns) == ["'=Formula heading", "number"]
+        and csv_back.iloc[:, 0].tolist() == expected_safe_values,
+        f"columns={list(csv_back.columns)}, values={csv_back.iloc[:, 0].tolist()}",
+    )
+    check("CSV export keeps negative numbers unprefixed", csv_back["number"].iloc[0] == "-42")
+    safe_csv.unlink()
+
+    safe_xlsx = exporter4.export_dataset(formula_df, "formula_safe", file_format="excel")
+    workbook = load_workbook(safe_xlsx, data_only=False)
+    worksheet = workbook["Data"]
+    excel_values = [worksheet.cell(row=row, column=1).value for row in range(2, 12)]
+    check(
+        "Excel export stores formula-like values as text",
+        worksheet.cell(row=1, column=1).value == "'=Formula heading"
+        and all(value.startswith("'") for value in excel_values[:-1])
+        and excel_values[-1] == "ordinary text"
+        and all(worksheet.cell(row=row, column=1).data_type != "f" for row in range(1, 12)),
+        f"heading={worksheet.cell(row=1, column=1).value!r}, values={excel_values}",
+    )
+    check(
+        "Excel export keeps negative numbers numeric",
+        worksheet.cell(row=2, column=2).value == -42
+        and worksheet.cell(row=2, column=2).data_type == "n",
+    )
+    workbook.close()
+    safe_xlsx.unlink()
+
+    formula_pickle = exporter4.export_dataset(formula_df, "formula_lossless", file_format="pickle")
+    check(
+        "pickle snapshots preserve formula-like source text",
+        pd.read_pickle(formula_pickle).equals(original_formula_df),
+    )
+    formula_pickle.unlink()
+    check(
+        "spreadsheet exports do not mutate the working dataset",
+        formula_df.equals(original_formula_df),
+    )
+
     csv_path.unlink()
     id_token_path.unlink()
     semi_path.unlink()
@@ -556,14 +633,14 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "rename_test.csv"), "csrf_token": ren_csrf},
+            data={"file": (fh, "rename_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
     columns = ["StudentID", "Name", "Age", "Gender", "Email", "Department", "CGPA", "EnrollmentDate"]
     res_dup = client.post(
         "/dataset/select-columns",
         data={
-            "csrf_token": ren_csrf,
+            "csrf_token": current_csrf(client),
             "selected_columns": columns,
             "rename_Name": "Zed",
             "rename_Department": "Zed",
@@ -573,7 +650,7 @@ with app.test_client() as client:
     check("duplicate rename target rejected", b"used more than once" in res_dup.data, "no flash seen")
     res_empty = client.post(
         "/dataset/select-columns",
-        data={"csrf_token": ren_csrf, "selected_columns": columns, "rename_Name": "   "},
+        data={"csrf_token": current_csrf(client), "selected_columns": columns, "rename_Name": "   "},
         follow_redirects=True,
     )
     check("empty rename target rejected", b"cannot be empty" in res_empty.data, "no flash seen")
@@ -625,7 +702,7 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "preview_test.csv"), "delimiter": ",", "csrf_token": prev_csrf},
+            data={"file": (fh, "preview_test.csv"), "delimiter": ",", "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
     with client.session_transaction() as sess:
@@ -633,7 +710,7 @@ with app.test_client() as client:
         original_bytes = original_path.read_bytes()
     prev_response = client.post(
         "/dataset/preview",
-        data={"op_duplicates": "1", "csrf_token": prev_csrf},
+        data={"op_duplicates": "1", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check("preview route renders", prev_response.status_code == 200 and b"Preview (nothing applied yet)" in prev_response.data)
@@ -651,7 +728,7 @@ with app.test_client() as client:
 
     applied_response = client.post(
         "/clean",
-        data={"op_duplicates": "1", "preview_token": token, "csrf_token": prev_csrf},
+        data={"op_duplicates": "1", "preview_token": token, "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check("fresh preview token applied", applied_response.status_code == 200)
@@ -666,19 +743,19 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "stale_preview_test.csv"), "csrf_token": stale_csrf},
+            data={"file": (fh, "stale_preview_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
     client.post(
         "/dataset/preview",
-        data={"op_duplicates": "1", "csrf_token": stale_csrf},
+        data={"op_duplicates": "1", "csrf_token": current_csrf(client)},
     )
     with client.session_transaction() as sess:
         sess["preview"]["dataset"] = {"path": "stale"}  # simulate a dataset change
         stale_token = sess["preview"]["token"]
     stale_response = client.post(
         "/clean",
-        data={"op_duplicates": "1", "preview_token": stale_token, "csrf_token": stale_csrf},
+        data={"op_duplicates": "1", "preview_token": stale_token, "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check(
@@ -727,13 +804,13 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "undo_test.csv"), "csrf_token": undo_csrf},
+            data={"file": (fh, "undo_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
 
     clean_res = client.post(
         "/clean",
-        data={"op_duplicates": "1", "csrf_token": undo_csrf},
+        data={"op_duplicates": "1", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check("cleaned run recorded", clean_res.status_code == 200)
@@ -749,12 +826,12 @@ with app.test_client() as client:
         stored_ops = sess["audit_log"][-1]["operations"]
     check("recipe stores ordered operations with parameters", stored_ops == [{"type": "duplicates", "mode": "first"}], str(stored_ops))
 
-    undo_res = client.post("/dataset/undo", data={"csrf_token": undo_csrf}, follow_redirects=True)
+    undo_res = client.post("/dataset/undo", data={"csrf_token": current_csrf(client)}, follow_redirects=True)
     check("undo flashes success", undo_res.status_code == 200)
     overview = client.get("/dataset")
     check("undo restores original 20 rows", b"20" in overview.data)
 
-    undo_again = client.post("/dataset/undo", data={"csrf_token": undo_csrf}, follow_redirects=True)
+    undo_again = client.post("/dataset/undo", data={"csrf_token": current_csrf(client)}, follow_redirects=True)
     check("undo with empty stack reports nothing to undo", b"No cleaning runs" in undo_again.data)
 
 # Undo restores a narrowed (column-selection) state, not just the original.
@@ -765,21 +842,21 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "narrow_undo_test.csv"), "csrf_token": narrow_csrf},
+            data={"file": (fh, "narrow_undo_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
     columns = ["StudentID", "Name", "Age", "Gender", "Department", "CGPA", "EnrollmentDate"]
     client.post(
         "/dataset/select-columns",
-        data={"csrf_token": narrow_csrf, "selected_columns": columns},
+        data={"csrf_token": current_csrf(client), "selected_columns": columns},
         follow_redirects=True,
     )
     client.post(
         "/clean",
-        data={"op_trim": "1", "csrf_token": narrow_csrf},
+        data={"op_trim": "1", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
-    undo_res = client.post("/dataset/undo", data={"csrf_token": narrow_csrf}, follow_redirects=True)
+    undo_res = client.post("/dataset/undo", data={"csrf_token": current_csrf(client)}, follow_redirects=True)
     overview = client.get("/dataset")
     check(
         "undo returns to the narrowed version (Email still dropped, 7 columns)",
@@ -795,14 +872,14 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "end8_test.csv"), "csrf_token": end8_csrf},
+            data={"file": (fh, "end8_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
-    client.post("/clean", data={"op_duplicates": "1", "csrf_token": end8_csrf}, follow_redirects=True)
+    client.post("/clean", data={"op_duplicates": "1", "csrf_token": current_csrf(client)}, follow_redirects=True)
     with client.session_transaction() as sess:
         stack_files = [Path(e["file"]) for e in sess.get("history_stack", [])]
     check("version files exist before end", stack_files and all(p.exists() for p in stack_files))
-    client.post("/session/end", data={"csrf_token": end8_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
     check("session end removes version files", all(not p.exists() for p in stack_files))
 
 
@@ -817,12 +894,12 @@ with app.test_client() as client:
         csrf = sess.get("csrf_token", "test-token")
 
     with open(messy_csv, "rb") as fh:
-        client.post("/upload", data={"file": (fh, "sample_messy_data.csv"), "csrf_token": csrf})
+        client.post("/upload", data={"file": (fh, "sample_messy_data.csv"), "csrf_token": current_csrf(client)})
     with client.session_transaction() as sess:
         reset_baseline = Path(sess["baseline_path"])
 
     # Pass 1: Trim whitespace & deduplicate
-    res1 = client.post("/clean", data={"op_duplicates": "1", "op_trim": "1", "csrf_token": csrf}, follow_redirects=True)
+    res1 = client.post("/clean", data={"op_duplicates": "1", "op_trim": "1", "csrf_token": current_csrf(client)}, follow_redirects=True)
     check("pass 1 clean succeeds", res1.status_code == 200 and b"Removed 2 duplicate row(s)" in res1.data)
 
     # Inspect overview/analysis for "Clean More"
@@ -835,7 +912,7 @@ with app.test_client() as client:
         data={
             "misscol_1": "CGPA",
             "missing_1": "median",
-            "csrf_token": csrf,
+            "csrf_token": current_csrf(client),
         },
         follow_redirects=True,
     )
@@ -849,7 +926,7 @@ with app.test_client() as client:
     # Reset to original upload
     res_reset = client.post(
         "/dataset/reset",
-        data={"csrf_token": csrf},
+        data={"csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check(
@@ -875,7 +952,7 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "type_test.csv"), "csrf_token": type_csrf},
+            data={"file": (fh, "type_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
 
@@ -886,7 +963,7 @@ with app.test_client() as client:
     type_response = client.post(
         "/dataset/select-columns",
         data={
-            "csrf_token": type_csrf,
+            "csrf_token": current_csrf(client),
             "selected_columns": columns,
             "type_StudentID": "Text",
         },
@@ -905,7 +982,7 @@ with app.test_client() as client:
     student_type_area = type_page[type_page.find("StudentID"):type_page.find("StudentID") + 500]
     check("selected datatype appears in Cleaning", "text" in student_type_area.lower())
 
-    client.post("/dataset/reset", data={"csrf_token": type_csrf})
+    client.post("/dataset/reset", data={"csrf_token": current_csrf(client)})
     with client.session_transaction() as sess:
         check("reset clears datatype selections", "column_type_overrides" not in sess)
 
@@ -920,13 +997,13 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "end_session_test.csv"), "csrf_token": end_csrf},
+            data={"file": (fh, "end_session_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
 
     client.post(
         "/clean",
-        data={"op_trim": "1", "csrf_token": end_csrf},
+        data={"op_trim": "1", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     client.get("/download?format=excel")
@@ -951,7 +1028,7 @@ with app.test_client() as client:
 
     end_response = client.post(
         "/session/end",
-        data={"csrf_token": end_csrf},
+        data={"csrf_token": current_csrf(client)},
         follow_redirects=False,
     )
     check(
@@ -961,31 +1038,6 @@ with app.test_client() as client:
     check("end session deletes all files", all(not path.exists() for path in session_paths))
     with client.session_transaction() as sess:
         check("end session clears progress", "original_filename" not in sess)
-
-with app.test_client() as client:
-    client.get("/upload")
-    with client.session_transaction() as sess:
-        beacon_csrf = sess.get("csrf_token", "test-token")
-    with open(messy_csv, "rb") as fh:
-        client.post(
-            "/upload",
-            data={"file": (fh, "beacon_end_test.csv"), "csrf_token": beacon_csrf},
-            content_type="multipart/form-data",
-        )
-    with client.session_transaction() as sess:
-        beacon_paths = {
-            Path(sess["upload_path"]),
-            Path(sess["baseline_path"]),
-        }
-    beacon_response = client.post(
-        "/session/end",
-        data={"csrf_token": beacon_csrf, "beacon": "1"},
-    )
-    check(
-        "tab-close beacon ends session",
-        beacon_response.status_code == 204
-        and all(not path.exists() for path in beacon_paths),
-    )
 
 # --------------------------------------------------------------------------
 # 10. Test Failed Upload File Cleanup
@@ -997,7 +1049,7 @@ with app.test_client() as client:
     # Upload corrupted file
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv"), "csrf_token": failed_upload_csrf},
+        data={"file": (io.BytesIO(b"\x00\x01broken"), "unparseable_test.csv"), "csrf_token": current_csrf(client)},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -1013,7 +1065,7 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(b"id,value\n1,kept\n"), "snapshot_kept.csv"),
-            "csrf_token": snapshot_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
@@ -1035,7 +1087,7 @@ with app.test_client() as client:
             "/upload",
             data={
                 "file": (io.BytesIO(b"id,value\n2,rejected\n"), failed_snapshot_name),
-                "csrf_token": snapshot_csrf,
+                "csrf_token": current_csrf(client),
             },
             content_type="multipart/form-data",
             follow_redirects=True,
@@ -1054,7 +1106,7 @@ with app.test_client() as client:
         "snapshot failure removes the rejected source",
         not (app.config["UPLOAD_FOLDER"] / failed_snapshot_name).exists(),
     )
-    client.post("/session/end", data={"csrf_token": snapshot_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 # --------------------------------------------------------------------------
 # 11. Route-level: dedup_mode and dedup_columns form fields are honored.
@@ -1066,12 +1118,12 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "dedup_mode_test.csv"), "csrf_token": dedup_csrf},
+            data={"file": (fh, "dedup_mode_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
     res_last = client.post(
         "/clean",
-        data={"op_duplicates": "1", "dedup_mode": "last", "csrf_token": dedup_csrf},
+        data={"op_duplicates": "1", "dedup_mode": "last", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check(
@@ -1085,7 +1137,7 @@ with app.test_client() as client:
     columns = ["StudentID", "Name", "Age", "Gender", "Email", "Department", "CGPA", "EnrollmentDate"]
     res_subset = client.post(
         "/clean",
-        data={"op_duplicates": "1", "dedup_mode": "first", "dedup_columns": ["Name", "Department"], "csrf_token": dedup_csrf},
+        data={"op_duplicates": "1", "dedup_mode": "first", "dedup_columns": ["Name", "Department"], "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check(
@@ -1127,7 +1179,7 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(b"age,name\n1, a \n, b \n"), "atomic_first.csv"),
-            "csrf_token": lifecycle_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
@@ -1150,7 +1202,7 @@ with app.test_client() as client:
             "misscol_1": "age",
             "missing_1": "custom",
             "missingval_1": "abc",
-            "csrf_token": lifecycle_csrf,
+            "csrf_token": current_csrf(client),
         },
         follow_redirects=True,
     )
@@ -1164,7 +1216,7 @@ with app.test_client() as client:
 
     client.post(
         "/clean",
-        data={"op_trim": "1", "csrf_token": lifecycle_csrf},
+        data={"op_trim": "1", "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     with client.session_transaction() as sess:
@@ -1175,7 +1227,7 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(b"new_id,value\n1,new\n"), "atomic_second.csv"),
-            "csrf_token": lifecycle_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
@@ -1198,7 +1250,7 @@ with app.test_client() as client:
         all(not path.exists() for path in first_owned),
         str(first_owned),
     )
-    client.post("/session/end", data={"csrf_token": lifecycle_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 with app.test_client() as client:
     client.get("/upload")
@@ -1208,13 +1260,13 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(b"v\na\na\n"), "dirty_preview.csv"),
-            "csrf_token": preview_dirty_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
     client.post(
         "/dataset/preview",
-        data={"op_duplicates": "1", "csrf_token": preview_dirty_csrf},
+        data={"op_duplicates": "1", "csrf_token": current_csrf(client)},
     )
     with client.session_transaction() as sess:
         dirty_token = sess["preview"]["token"]
@@ -1225,7 +1277,7 @@ with app.test_client() as client:
             "op_trim": "1",
             "preview_token": dirty_token,
             "preview_dirty": "1",
-            "csrf_token": preview_dirty_csrf,
+            "csrf_token": current_csrf(client),
         },
         follow_redirects=True,
     )
@@ -1236,7 +1288,7 @@ with app.test_client() as client:
             and sess.get("current_path") == dirty_original
             and not sess.get("history_stack"),
         )
-    client.post("/session/end", data={"csrf_token": preview_dirty_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 with app.test_client() as client:
     client.get("/upload")
@@ -1246,22 +1298,22 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(b"v\n a \n a \n"), "version_cleanup.csv"),
-            "csrf_token": version_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
-    client.post("/clean", data={"op_trim": "1", "csrf_token": version_csrf})
-    client.post("/clean", data={"op_duplicates": "1", "csrf_token": version_csrf})
+    client.post("/clean", data={"op_trim": "1", "csrf_token": current_csrf(client)})
+    client.post("/clean", data={"op_duplicates": "1", "csrf_token": current_csrf(client)})
     with client.session_transaction() as sess:
         version_paths = [Path(entry["file"]) for entry in sess["history_stack"]]
         source_for_undo = Path(sess["upload_path"])
         baseline_for_undo = Path(sess["baseline_path"])
-    client.post("/dataset/undo", data={"csrf_token": version_csrf})
+    client.post("/dataset/undo", data={"csrf_token": current_csrf(client)})
     check(
         "undo immediately deletes the discarded version file",
         not version_paths[1].exists() and version_paths[0].exists(),
     )
-    client.post("/dataset/undo", data={"csrf_token": version_csrf})
+    client.post("/dataset/undo", data={"csrf_token": current_csrf(client)})
     check(
         "undoing the first run restores the baseline snapshot",
         not version_paths[0].exists()
@@ -1274,7 +1326,7 @@ with app.test_client() as client:
             sess.get("current_path") == str(baseline_for_undo),
         )
     check("reset endpoint rejects destructive GET", client.get("/dataset/reset").status_code == 405)
-    client.post("/session/end", data={"csrf_token": version_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 with app.test_client() as client:
     client.get("/upload")
@@ -1283,7 +1335,7 @@ with app.test_client() as client:
     source_bytes = b"code,value,unused\n001,1,x\n002,2,y\n"
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(source_bytes), "selection_recipe.csv"), "csrf_token": recipe_csrf},
+        data={"file": (io.BytesIO(source_bytes), "selection_recipe.csv"), "csrf_token": current_csrf(client)},
         content_type="multipart/form-data",
     )
     with client.session_transaction() as sess:
@@ -1291,7 +1343,7 @@ with app.test_client() as client:
     client.post(
         "/dataset/select-columns",
         data={
-            "csrf_token": recipe_csrf,
+            "csrf_token": current_csrf(client),
             "selected_columns": ["code", "value"],
             "rename_value": "score",
             "type_value": "Text",
@@ -1319,7 +1371,7 @@ with app.test_client() as client:
         str(audit_payload["recipe"]),
     )
 
-    client.post("/clean", data={"op_trim": "1", "csrf_token": recipe_csrf})
+    client.post("/clean", data={"op_trim": "1", "csrf_token": current_csrf(client)})
     csv_download = client.get("/download?format=csv")
     with client.session_transaction() as sess:
         csv_download_path = Path(sess["csv_path"])
@@ -1329,7 +1381,7 @@ with app.test_client() as client:
         csv_download.status_code == 200 and csv_download_path.exists() and csv_is_owned,
     )
     csv_download.close()
-    client.post("/session/end", data={"csrf_token": recipe_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
     check("ending the session deletes generated CSV downloads", not csv_download_path.exists())
 
 with app.test_client() as client:
@@ -1346,13 +1398,13 @@ with app.test_client() as client:
         data={
             "file": (workbook, "selected_sheet.xlsx"),
             "sheet": "Second",
-            "csrf_token": sheet_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
     sheet_response = client.post(
         "/dataset/select-columns",
-        data={"selected_columns": ["second_col"], "csrf_token": sheet_csrf},
+        data={"selected_columns": ["second_col"], "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check(
@@ -1361,7 +1413,7 @@ with app.test_client() as client:
         and b"second_col" in sheet_response.data
         and b"first_col" not in sheet_response.data,
     )
-    client.post("/session/end", data={"csrf_token": sheet_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 # --------------------------------------------------------------------------
 # 14. Case-only cleaning keeps unresolved category mapping visible.
@@ -1378,7 +1430,7 @@ with app.test_client() as client:
         "/upload",
         data={
             "file": (io.BytesIO(category_csv), "category_review.csv"),
-            "csrf_token": category_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
@@ -1397,7 +1449,7 @@ with app.test_client() as client:
         data={
             "textcol_1": "Gender",
             "case_1": "lower",
-            "csrf_token": category_csrf,
+            "csrf_token": current_csrf(client),
         },
         follow_redirects=True,
     )
@@ -1432,7 +1484,7 @@ with app.test_client() as client:
             "map_1_2_1": "male",
             "mapvar_1_2_2": "male",
             "map_1_2_2": "male",
-            "csrf_token": category_csrf,
+            "csrf_token": current_csrf(client),
         },
     )
     with client.session_transaction() as sess:
@@ -1447,13 +1499,13 @@ with app.test_client() as client:
         == ["female", "female", "female", "male", "male", "male"],
         str(mapped_category_df["Gender"].tolist()),
     )
-    client.post("/dataset/undo", data={"csrf_token": category_csrf})
+    client.post("/dataset/undo", data={"csrf_token": current_csrf(client)})
     with client.session_transaction() as sess:
         check(
             "undo restores the pending category review state",
             sess.get("pending_category_columns") == ["Gender"],
         )
-    client.post("/session/end", data={"csrf_token": category_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 # --------------------------------------------------------------------------
 # 15. Phase 9 â€” broader analysis findings (counts + examples, read-only).
@@ -1681,11 +1733,11 @@ with app.test_client() as client:
     tools_csv = "name,code,region,amount\n Jane ,a-1,x,10\nJohn,b-2,x,\nAna,c-3,y,300\n".encode("utf-8")
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(tools_csv), "tools_test.csv"), "csrf_token": tools_csrf},
+        data={"file": (io.BytesIO(tools_csv), "tools_test.csv"), "csrf_token": current_csrf(client)},
         content_type="multipart/form-data",
     )
     tools_form = {
-        "csrf_token": tools_csrf,
+        "csrf_token": current_csrf(client),
         "op_normalize": "1",
         "regex_column": "name",
         "regex_pattern": "^J",
@@ -1736,7 +1788,7 @@ with app.test_client() as client:
         and applied_df["code_left"].tolist() == ["a", "b", "c"],
         str(list(applied_df.columns)),
     )
-    client.post("/dataset/undo", data={"csrf_token": tools_csrf}, follow_redirects=True)
+    client.post("/dataset/undo", data={"csrf_token": current_csrf(client)}, follow_redirects=True)
     with client.session_transaction() as sess:
         undone_df = dataset_importer.load_dataset(Path(sess["current_path"]))
     check(
@@ -1744,7 +1796,7 @@ with app.test_client() as client:
         "code" in undone_df.columns and "who" not in undone_df.columns,
         str(list(undone_df.columns)),
     )
-    client.post("/session/end", data={"csrf_token": tools_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 # --------------------------------------------------------------------------
 # 16b. Phase 9 â€” user-defined validation rules and their actions.
@@ -1872,7 +1924,7 @@ with app.test_client() as client:
         with open(messy_csv, "rb") as fh:
             rejected = client.post(
                 "/upload",
-                data={"file": (fh, "too_big_rows.csv"), "csrf_token": limit_csrf},
+                data={"file": (fh, "too_big_rows.csv"), "csrf_token": current_csrf(client)},
                 content_type="multipart/form-data",
                 follow_redirects=True,
             )
@@ -1890,7 +1942,7 @@ with app.test_client() as client:
         data={
             "file": (io.BytesIO(broken_csv), "unreadable_upload.csv"),
             "delimiter": ",",
-            "csrf_token": limit_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -2056,7 +2108,7 @@ with app.test_client() as client:
     recipe_csv = b"name,score,extra\n Alice ,10,x\nBob,120,y\n"
     client.post(
         "/upload",
-        data={"file": (io.BytesIO(recipe_csv), "recipe_target.csv"), "csrf_token": recipe_csrf},
+        data={"file": (io.BytesIO(recipe_csv), "recipe_target.csv"), "csrf_token": current_csrf(client)},
         content_type="multipart/form-data",
     )
     with client.session_transaction() as sess:
@@ -2064,7 +2116,7 @@ with app.test_client() as client:
     multi_preview = client.post(
         "/dataset/preview",
         data={
-            "csrf_token": recipe_csrf,
+            "csrf_token": current_csrf(client),
             "validation_rule_json": [json.dumps(rule) for rule in multi_rules],
         },
         follow_redirects=True,
@@ -2082,7 +2134,7 @@ with app.test_client() as client:
         "/recipe/inspect",
         data={
             "recipe_file": (io.BytesIO(b" " * (Config.MAX_RECIPE_BYTES + 1)), "large.json"),
-            "csrf_token": recipe_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -2094,7 +2146,7 @@ with app.test_client() as client:
         "/recipe/inspect",
         data={
             "recipe_file": (io.BytesIO(json.dumps(recipe_payload).encode()), "recipe.json"),
-            "csrf_token": recipe_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -2109,7 +2161,7 @@ with app.test_client() as client:
         check("recipe review does not change the working dataset", sess["current_path"] == before_recipe_path)
     applied = client.post(
         "/recipe/apply",
-        data={"recipe_token": recipe_token, "csrf_token": recipe_csrf},
+        data={"recipe_token": recipe_token, "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check("reviewed recipe applies as one result", b"Applied 2 reviewed recipe run(s)" in applied.data)
@@ -2125,7 +2177,7 @@ with app.test_client() as client:
     )
     audit = client.get("/download/audit").get_json()
     check("imported recipe remains replayable in the audit export", audit["recipe"] == normalized_recipe)
-    client.post("/dataset/undo", data={"csrf_token": recipe_csrf})
+    client.post("/dataset/undo", data={"csrf_token": current_csrf(client)})
     with client.session_transaction() as sess:
         undone_recipe_df = dataset_importer.load_dataset(Path(sess["current_path"]), delimiter="auto")
     check("one undo reverses the entire imported recipe", list(undone_recipe_df.columns) == ["name", "score", "extra"])
@@ -2134,7 +2186,7 @@ with app.test_client() as client:
         "/recipe/inspect",
         data={
             "recipe_file": (io.BytesIO(json.dumps(recipe_payload).encode()), "recipe.json"),
-            "csrf_token": recipe_csrf,
+            "csrf_token": current_csrf(client),
         },
         content_type="multipart/form-data",
     )
@@ -2145,13 +2197,13 @@ with app.test_client() as client:
         changed_file.write(b"\n")
     stale = client.post(
         "/recipe/apply",
-        data={"recipe_token": stale_token, "csrf_token": recipe_csrf},
+        data={"recipe_token": stale_token, "csrf_token": current_csrf(client)},
         follow_redirects=True,
     )
     check("stale recipe review is rejected", b"review is out of date" in stale.data)
     with client.session_transaction() as sess:
         check("stale recipe rejection is atomic", sess["current_path"] == str(stale_path))
-    client.post("/session/end", data={"csrf_token": recipe_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 # --------------------------------------------------------------------------
 # 20. Phase 10 â€” session file expiry and isolated output paths.
@@ -2182,10 +2234,10 @@ with app.test_client() as client:
     with open(messy_csv, "rb") as fh:
         client.post(
             "/upload",
-            data={"file": (fh, "namespace_test.csv"), "csrf_token": ns_csrf},
+            data={"file": (fh, "namespace_test.csv"), "csrf_token": current_csrf(client)},
             content_type="multipart/form-data",
         )
-    client.post("/clean", data={"op_trim": "1", "csrf_token": ns_csrf}, follow_redirects=True)
+    client.post("/clean", data={"op_trim": "1", "csrf_token": current_csrf(client)}, follow_redirects=True)
     with client.session_transaction() as sess:
         namespace = sess.get("output_namespace")
         output_path = Path(sess["processed_path"])
@@ -2194,7 +2246,7 @@ with app.test_client() as client:
         bool(namespace) and output_path.parent.name == namespace and output_path.exists(),
         f"namespace={namespace} path={output_path}",
     )
-    client.post("/session/end", data={"csrf_token": ns_csrf})
+    client.post("/session/end", data={"csrf_token": current_csrf(client)})
 
 print()
 if failures:

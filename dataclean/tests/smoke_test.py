@@ -64,10 +64,17 @@ with app.test_client() as client:
             content_type="multipart/form-data",
         )
     check("valid upload redirects", response.status_code == 302)
+    with client.session_transaction() as sess:
+        csrf = sess["csrf_token"]
 
     # 5. Dataset overview page
     response = client.get("/dataset")
     check("dataset page renders", response.status_code == 200 and b"Column Information" in response.data)
+    check(
+        "workspace responses are not cached",
+        response.headers.get("Cache-Control") == "no-store, private"
+        and response.headers.get("Pragma") == "no-cache",
+    )
     check("overview shows 20 rows", b"20" in response.data and b"StudentID" in response.data)
     check("column selection panel renders", b"Column Selection" in response.data)
     check("column checkboxes present", b'name="selected_columns"' in response.data)
@@ -106,8 +113,18 @@ with app.test_client() as client:
     # 8. Downloads
     response = client.get("/download?format=csv")
     check("csv download works", response.status_code == 200 and b"StudentID" in response.data)
+    check(
+        "csv download is not cached",
+        response.headers.get("Cache-Control") == "no-store, private"
+        and response.headers.get("Pragma") == "no-cache",
+    )
     response = client.get("/download?format=excel")
     check("excel download works", response.status_code == 200 and response.data[:2] == b"PK")
+    check(
+        "excel download is not cached",
+        response.headers.get("Cache-Control") == "no-store, private"
+        and response.headers.get("Pragma") == "no-cache",
+    )
 
     # 9. Download without a processed file 404s
     with app.test_client() as fresh_client:

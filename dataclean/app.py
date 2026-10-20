@@ -4,21 +4,55 @@ Run from the dataclean/ directory with:
     flask --app app run --debug
 """
 
+import os
 import secrets
 
-from config import Config
+from cachelib import FileSystemCache
+from config import Config, config_for_environment
 from features.cleaning.routes import cleaning_bp
 from features.dataset.routes import dataset_bp
 from features.upload.routes import upload_bp
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session
+from utils.csrf import check_csrf
 from utils.frontend_assets import register_frontend_assets
 
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+_CSRF_SESSION_GET_ENDPOINTS = {
+    "upload.upload_page",
+    "dataset.show_dataset",
+    "dataset.dataset_analysis",
+    "cleaning.cleaning_result",
+}
 
-def create_app(config_class: type[Config] = Config) -> Flask:
+_PRIVATE_RESPONSE_BLUEPRINTS = {"dataset", "cleaning"}
+_PRIVATE_UPLOAD_ENDPOINTS = {
+    "upload.upload_page",
+    "upload.upload_dataset",
+    "upload.end_session",
+}
+
+_CONTENT_SECURITY_POLICY = "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+
+def create_app(config_class: type[Config] | None = None) -> Flask:
     """Application factory: build, configure and wire up the Flask app."""
     app = Flask(__name__)
-    app.config.from_object(config_class)
+    app.config.from_object(config_class or config_for_environment())
+    if app.config["APP_ENV"] == "production":
+        secret_key = app.config.get("SECRET_KEY") or os.environ.get("DATACLEAN_SECRET_KEY")
+        if not secret_key:
+            raise RuntimeError(
+                "DATACLEAN_SECRET_KEY must be set when DATACLEAN_ENV=production."
+            )
+        if len(secret_key.encode("utf-8")) < 32:
+            raise RuntimeError("DATACLEAN_SECRET_KEY must contain at least 32 bytes.")
+        app.config["SECRET_KEY"] = secret_key
+    app.config["SESSION_CACHELIB"] = FileSystemCache(
+        cache_dir=str(app.config["SESSION_CACHE_DIR"]),
+        threshold=500,
+        mode=0o600,
+    )
     Session(app)
 
     _ensure_folders(app)
@@ -31,12 +65,40 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     _register_error_handlers(app)
 
     @app.before_request
+    def _protect_state_changing_requests():
+        """Require CSRF validation for every matched mutation endpoint."""
+        if request.method in _UNSAFE_METHODS and request.url_rule is not None:
+            check_csrf()
+
+    @app.before_request
     def _seed_csrf_token():
-        """Ensure every session has a CSRF token."""
-        if request.endpoint in {"static", "frontend_asset"}:
+        """Start a CSRF-backed session only when entering the workspace."""
+        if request.method != "GET" or request.endpoint not in _CSRF_SESSION_GET_ENDPOINTS:
             return
         if "csrf_token" not in session:
             session["csrf_token"] = secrets.token_hex(32)
+
+    @app.after_request
+    def _prevent_private_response_caching(response):
+        """Keep workspace data and generated files out of browser caches."""
+        if (
+            request.blueprint in _PRIVATE_RESPONSE_BLUEPRINTS
+            or request.endpoint in _PRIVATE_UPLOAD_ENDPOINTS
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.after_request
+    def _add_security_headers(response):
+        """Apply browser protections without restricting the existing UI assets."""
+        response.headers["Content-Security-Policy"] = _CONTENT_SECURITY_POLICY
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "same-origin"
+        if app.config["APP_ENV"] == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        return response
 
     @app.context_processor
     def inject_globals():

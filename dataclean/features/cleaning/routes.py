@@ -23,7 +23,6 @@ from flask import (
 )
 from workspace import dataset_exporter
 from workspace.session import dataset_session
-from utils.csrf import check_csrf
 from utils.validators import dataset_limit_error, validate_column
 
 from features.cleaning import operations as cleaning_operations
@@ -34,7 +33,6 @@ cleaning_bp = Blueprint("cleaning", __name__)
 @cleaning_bp.route("/clean", methods=["POST"])
 def clean_dataset():
     """Parse the user's selected operations and apply them via the service."""
-    check_csrf()
     working_path = dataset_session.working_path
     if not working_path:
         flash("Please upload a dataset first.", "error")
@@ -218,8 +216,11 @@ def cleaning_result():
     """Show before/after summary, the cleaning history and a data preview."""
     processed_path = session.get("processed_path")
     if not processed_path:
-        flash("No cleaning result found. Please upload and clean a dataset first.", "error")
-        return redirect(url_for("upload.index"))
+        flash(
+            "Your workspace is unavailable or has expired. Upload a dataset to begin again.",
+            "error",
+        )
+        return redirect(url_for("upload.upload_page"))
 
     df = dataset_importer.load_dataset(processed_path)
     if df is None:
@@ -350,7 +351,6 @@ def download_audit():
 @cleaning_bp.route("/recipe/inspect", methods=["POST"])
 def inspect_recipe():
     """Validate and dry-run an uploaded recipe without changing the dataset."""
-    check_csrf()
     recipe_file = request.files.get("recipe_file")
     if not dataset_session.working_path:
         flash("Please upload a dataset first.", "error")
@@ -400,7 +400,6 @@ def inspect_recipe():
 @cleaning_bp.route("/recipe/apply", methods=["POST"])
 def apply_recipe():
     """Re-run and atomically commit a previously reviewed recipe."""
-    check_csrf()
     preview = session.get("recipe_preview") or {}
     recipe = preview.get("recipe")
     token = request.form.get("recipe_token", "")

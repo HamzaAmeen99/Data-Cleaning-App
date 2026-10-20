@@ -1,7 +1,17 @@
 """Homepage, product intro and file upload routes."""
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
-from utils.csrf import check_csrf
+import secrets
+
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from workspace.session import dataset_session
 
 from .workflow import process_upload
@@ -24,7 +34,6 @@ def upload_page():
 @upload_bp.route("/session/end", methods=["POST"])
 def end_session():
     """Delete the active session's files and discard all workflow progress."""
-    check_csrf()
     is_beacon = request.form.get("beacon") == "1"
     dataset_session.end()
     if is_beacon:
@@ -41,14 +50,16 @@ def sample_redirect():
 @upload_bp.route("/upload", methods=["POST"])
 def upload_dataset():
     """Receive, validate and store the uploaded file, then go to the overview."""
-    check_csrf()
     accepted, message = process_upload(
         request.files.get("file"),
         request.form.get("encoding", ""),
         request.form.get("delimiter", ""),
         request.form.get("sheet", ""),
     )
-    flash(message, "success" if accepted else "error")
     if accepted:
+        current_app.session_interface.regenerate(session)
+        session["csrf_token"] = secrets.token_hex(32)
+        flash(message, "success")
         return redirect(url_for("dataset.show_dataset"))
+    flash(message, "error")
     return redirect(url_for("upload.upload_page"))

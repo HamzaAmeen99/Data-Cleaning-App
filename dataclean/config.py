@@ -3,20 +3,21 @@
 
 import os
 import secrets
+from datetime import timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
 class Config:
-    """Base application configuration."""
+    """Shared settings with safe defaults for local development."""
 
-    # Random per-boot key in dev sessions; set DATACLEAN_SECRET_KEY for a stable key in deployment
+    APP_ENV = "development"
     SECRET_KEY = os.environ.get("DATACLEAN_SECRET_KEY") or secrets.token_hex(32)
 
     # Server-side sessions keep dataset state off the 4 KB cookie (only a SID travels)
-    SESSION_TYPE = "filesystem"
-    SESSION_FILE_DIR = BASE_DIR / "instance" / "flask_session"
+    SESSION_TYPE = "cachelib"
+    SESSION_CACHE_DIR = BASE_DIR / "instance" / "flask_session"
 
     # File storage (kept out of /static so uploads are never served directly)
     UPLOAD_FOLDER = BASE_DIR / "uploads"
@@ -38,6 +39,9 @@ class Config:
 
     # Uploaded/processed files nobody has touched for this long are swept away.
     FILE_TTL_SECONDS = 24 * 60 * 60
+    SESSION_PERMANENT = True
+    PERMANENT_SESSION_LIFETIME = timedelta(seconds=FILE_TTL_SECONDS)
+    SESSION_REFRESH_EACH_REQUEST = False
 
     # Supported file formats
     ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls"}
@@ -52,3 +56,43 @@ class Config:
     # Whitespace-only and empty cells always count as missing; these extras
     # count too once the user opts in per column.
     MISSING_TOKENS = ("n/a", "na", "null", "-", "--")
+
+
+class DevelopmentConfig(Config):
+    """Local configuration; a temporary secret is acceptable here."""
+
+
+class TestingConfig(Config):
+    """Deterministic configuration for isolated automated tests."""
+
+    APP_ENV = "testing"
+    TESTING = True
+    SECRET_KEY = "dataclean-testing-only-secret"
+
+
+class ProductionConfig(Config):
+    """Production configuration; create_app supplies and validates the secret."""
+
+    APP_ENV = "production"
+    SECRET_KEY = None
+    SESSION_COOKIE_NAME = "__Host-dataclean"
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_PATH = "/"
+    SESSION_COOKIE_DOMAIN = None
+
+
+def config_for_environment(name: str | None = None) -> type[Config]:
+    """Select one explicit application environment."""
+    environment = (name or os.environ.get("DATACLEAN_ENV", "development")).strip().lower()
+    configurations = {
+        "development": DevelopmentConfig,
+        "testing": TestingConfig,
+        "production": ProductionConfig,
+    }
+    try:
+        return configurations[environment]
+    except KeyError as exc:
+        choices = ", ".join(configurations)
+        raise RuntimeError(f"DATACLEAN_ENV must be one of: {choices}.") from exc

@@ -50,9 +50,6 @@ function setupPreviewBinding() {
   form.addEventListener("input", markDirty);
 }
 
-let sessionEnding = false;
-let internalSessionNavigation = false;
-
 function setupSessionEnding() {
   if (document.body.dataset.sessionActive !== "true") return;
 
@@ -60,7 +57,6 @@ function setupSessionEnding() {
   const openButton = document.getElementById("end-session-btn");
   const closeButton = document.getElementById("end-session-close");
   const cancelButton = document.getElementById("end-session-cancel");
-  const endForm = document.getElementById("end-session-form");
 
   const openModal = () => {
     if (!modal) return;
@@ -82,63 +78,32 @@ function setupSessionEnding() {
       if (event.target === modal) closeModal();
     });
   }
-  if (endForm) {
-    endForm.addEventListener("submit", () => {
-      sessionEnding = true;
-    });
-  }
-
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modal && !modal.classList.contains("hidden")) {
       closeModal();
     }
   });
 
-  const markInternalNavigation = () => {
-    internalSessionNavigation = true;
-  };
+  const navigation = window.performance?.getEntriesByType?.("navigation")[0];
+  if (navigation?.type === "reload") {
+    // Let the workspace paint before the blocking browser confirmation opens.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      if (!window.confirm(
+        "Refreshing ends this DataClean session and deletes its files. Continue?"
+      )) return;
 
-  document.addEventListener("click", (event) => {
-    const link = event.target instanceof Element
-      ? event.target.closest("a[href]")
-      : null;
-    if (!link) return;
-    const destination = new URL(link.href, window.location.href);
-    if (destination.origin === window.location.origin) markInternalNavigation();
-  }, true);
-
-  document.addEventListener("submit", (event) => {
-    if (event.target !== endForm && !event.defaultPrevented) markInternalNavigation();
-  });
-
-  window.addEventListener("pageshow", () => {
-    sessionEnding = false;
-    internalSessionNavigation = false;
-  });
-
-  window.addEventListener("beforeunload", (event) => {
-    if (sessionEnding || internalSessionNavigation) return;
-    event.preventDefault();
-    event.returnValue = "";
-  });
-
-  window.addEventListener("pagehide", (event) => {
-    if (event.persisted || sessionEnding || internalSessionNavigation) return;
-    sessionEnding = true;
-
-    const formData = new FormData();
-    formData.append("csrf_token", document.body.dataset.csrfToken || "");
-    formData.append("beacon", "1");
-    const url = document.body.dataset.endSessionUrl;
-
-    if (navigator.sendBeacon && navigator.sendBeacon(url, formData)) return;
-    fetch(url, {
-      method: "POST",
-      body: formData,
-      credentials: "same-origin",
-      keepalive: true,
-    }).catch(() => {});
-  });
+      const formData = new FormData();
+      formData.append("csrf_token", document.body.dataset.csrfToken || "");
+      formData.append("beacon", "1");
+      fetch(document.body.dataset.endSessionUrl, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      }).then(() => {
+        window.location.replace(document.body.dataset.uploadUrl);
+      }).catch(() => {});
+    }));
+  }
 }
 
 function setupLoadingScreen() {
@@ -176,7 +141,6 @@ function setupLoadingScreen() {
       screen.setAttribute("aria-hidden", "false");
       document.body.classList.add("is-processing");
       document.body.setAttribute("aria-busy", "true");
-      internalSessionNavigation = true;
       form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
         button.disabled = true;
       });

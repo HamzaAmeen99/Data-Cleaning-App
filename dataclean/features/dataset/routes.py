@@ -7,7 +7,6 @@ from features.cleaning import operations as cleaning_operations
 from features.upload import dataset_importer
 from workspace import dataset_exporter
 from workspace.session import dataset_session
-from utils.csrf import check_csrf
 
 from features.dataset import analysis as analysis_tools
 
@@ -38,7 +37,10 @@ def show_dataset():
                 "error",
             )
             return redirect(url_for("upload.upload_page"))
-        flash("Please upload a dataset first.", "error")
+        flash(
+            "Your workspace is unavailable or has expired. Upload a dataset to begin again.",
+            "error",
+        )
         return redirect(url_for("upload.upload_page"))
     if df.empty:
         csrf_token = session.get("csrf_token")
@@ -101,8 +103,11 @@ def dataset_analysis():
     """Display detected data-quality problems and cleaning suggestions."""
     df = _load_current_dataset()
     if df is None:
-        flash("Please upload a dataset first.", "error")
-        return redirect(url_for("upload.index"))
+        flash(
+            "Your workspace is unavailable or has expired. Upload a dataset to begin again.",
+            "error",
+        )
+        return redirect(url_for("upload.upload_page"))
 
     analysis = analysis_tools.analyze_dataset(
         df, session.get("pending_category_columns", [])
@@ -178,7 +183,6 @@ def preview_cleaning():
     Stores the preview bound to the dataset version and the operation
     parameters; /clean rejects applications bound to a stale preview.
     """
-    check_csrf()
     working_path = dataset_session.working_path
     if not working_path:
         flash("Please upload a dataset first.", "error")
@@ -219,7 +223,6 @@ def preview_cleaning():
 @dataset_bp.route("/dataset/undo", methods=["POST"])
 def undo_dataset():
     """Undo the latest committed cleaning/narrowing run."""
-    check_csrf()
     popped = dataset_session.undo_latest()
     if popped is None:
         flash("No cleaning runs to undo.", "error")
@@ -235,7 +238,6 @@ def undo_dataset():
 @dataset_bp.route("/dataset/reset", methods=["POST"])
 def reset_dataset():
     """Reset the working dataset back to the original uploaded file."""
-    check_csrf()
     if not dataset_session.upload_path:
         flash("No uploaded dataset found.", "error")
         return redirect(url_for("upload.index"))
@@ -250,8 +252,6 @@ def select_columns():
     """Persist the user's column selection and drop unselected columns from the
     working dataset so the cleaning pipeline only operates on chosen columns.
     """
-    check_csrf()
-
     working_path = dataset_session.working_path
     if not working_path:
         flash("Please upload a dataset first.", "error")

@@ -21,6 +21,10 @@ class AssetSessionInterface(SessionInterface):
         if request.endpoint != "frontend_asset":
             self.delegate.save_session(app, session, response)
 
+    def regenerate(self, session):
+        """Delegate server-side session ID rotation to Flask-Session."""
+        self.delegate.regenerate(session)
+
 
 def register_frontend_assets(app):
     app.session_interface = AssetSessionInterface(app.session_interface)

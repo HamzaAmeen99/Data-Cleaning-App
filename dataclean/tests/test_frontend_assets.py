@@ -23,7 +23,7 @@ class FrontendAssetsTest(unittest.TestCase):
 
         class TestConfig(Config):
             TESTING = True
-            SESSION_FILE_DIR = root / "sessions"
+            SESSION_CACHE_DIR = root / "sessions"
             UPLOAD_FOLDER = root / "uploads"
             PROCESSED_FOLDER = root / "processed"
 
@@ -52,6 +52,7 @@ class FrontendAssetsTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn("max-age=31536000", response.headers["Cache-Control"])
             self.assertIn("immutable", response.headers["Cache-Control"])
+            self.assertNotIn("no-store", response.headers["Cache-Control"])
             self.assertNotIn("Set-Cookie", response.headers)
             self.assertNotIn("Cookie", response.headers.get("Vary", ""))
             cached = client.get(self.js, headers={"If-None-Match": response.headers["ETag"]})
@@ -72,6 +73,19 @@ class FrontendAssetsTest(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
             self.assertNotIn("immutable", response.headers.get("Cache-Control", ""))
         self.assertNotIn("immutable", self.client.get("/").headers.get("Cache-Control", ""))
+
+    def test_only_reload_offers_to_end_the_workspace(self):
+        with self.client.get(self.js) as response:
+            script = response.get_data(as_text=True)
+
+        self.assertIn('navigation?.type === "reload"', script)
+        self.assertIn("window.confirm", script)
+        self.assertIn("requestAnimationFrame", script)
+        for unrelated_lifecycle_event in ("beforeunload", "pagehide", "visibilitychange"):
+            self.assertNotIn(unrelated_lifecycle_event, script)
+        self.assertIn("data-end-session-url", self.page)
+        self.assertIn("data-upload-url", self.page)
+        self.assertIn("data-csrf-token", self.page)
 
 
 class FrontendAssetRefreshTest(unittest.TestCase):
